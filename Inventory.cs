@@ -6,11 +6,8 @@ using ExileCore.Shared.Enums;
 using SharpDX;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using WindowsInput.Native;
+using System.Windows.Forms;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -19,7 +16,7 @@ namespace Assistant {
 		// the physical layout of the backpack:
 		private static NormalInventoryItem[,] inventoryMap = new NormalInventoryItem[12, 5]; // one Entity appears more than once if it takes up more than one grid
 		public static void Initialise() {
-			OnRelease(VirtualKeyCode.VK_I, () => {
+			OnRelease(Keys.I, () => {
 				try { RefreshBackpack(); } catch ( Exception e ) { Log(e.StackTrace); }
 			});
 		}
@@ -148,9 +145,9 @@ namespace Assistant {
 			// leftClick will be a sequence of states like: SHIFT, CLICK, CLICK, CLICK, SHIFT UP
 			// but we build it in reverse (so we can chain the Next pointers easily)
 			// start with the tail piece: CLICK, SHIFT UP
-			State leftClick = new LeftClickAt(targetItemPosition, inputSpeed, clicks, new KeyUp(VirtualKeyCode.LSHIFT, new Delay(inputSpeed, next)));
+			State leftClick = new LeftClickAt(targetItemPosition, inputSpeed, clicks, new KeyUp(Keys.LShiftKey, new Delay(inputSpeed, next)));
 			// attach the header: SHIFT DOWN
-			leftClick = new KeyDown(VirtualKeyCode.LSHIFT, new Delay(50, leftClick));
+			leftClick = new KeyDown(Keys.LShiftKey, new Delay(50, leftClick));
 			// finish with the plan to use the stash item
 			return PlanUseItem(path, leftClick);
 		}
@@ -178,9 +175,9 @@ namespace Assistant {
 		internal static State PlanUseStashItemOnItem(string path, NormalInventoryItem item, uint clicks = 1, State next = null) {
 			var pos = item.GetClientRect().Center;
 			return PlanUseStashItem(path, 
-				new KeyDown(VirtualKeyCode.LSHIFT, new Delay(50,
+				new KeyDown(Keys.LShiftKey, new Delay(50,
 				new LeftClickAt(pos, inputSpeed, clicks,
-				new KeyUp(VirtualKeyCode.LSHIFT, new Delay(inputSpeed, next))))));
+				new KeyUp(Keys.LShiftKey, new Delay(inputSpeed, next))))));
 		}
 
 		public static bool UseItemOnItem(string path, NormalInventoryItem item, uint clicks = 1) {
@@ -283,17 +280,17 @@ namespace Assistant {
 			{  PATH_SCROLL_PORTAL, 40 },
 			{  PATH_REMNANT_OF_CORRUPTION, 9 },
 		};
-		private static readonly VirtualKeyCode[] numberKeys = new VirtualKeyCode[] {
-			VirtualKeyCode.VK_0,
-			VirtualKeyCode.VK_1,
-			VirtualKeyCode.VK_2,
-			VirtualKeyCode.VK_3,
-			VirtualKeyCode.VK_4,
-			VirtualKeyCode.VK_5,
-			VirtualKeyCode.VK_6,
-			VirtualKeyCode.VK_7,
-			VirtualKeyCode.VK_8,
-			VirtualKeyCode.VK_9,
+		private static readonly Keys[] numberKeys = new Keys[] {
+			Keys.D0,
+			Keys.D1,
+			Keys.D2,
+			Keys.D3,
+			Keys.D4,
+			Keys.D5,
+			Keys.D6,
+			Keys.D7,
+			Keys.D8,
+			Keys.D9,
 		};
 		internal static uint inputSpeed = 40;
 
@@ -340,7 +337,7 @@ namespace Assistant {
 				}
 				if ( !BackpackIsOpen() ) {
 					Log($"TeleportHome: opening backpack");
-					return new KeyDown(VirtualKeyCode.VK_I, new Delay(500, state));
+					return new KeyDown(Keys.I, new Delay(500, state));
 				}
 				Log($"TeleportHome: using a Portal scroll");
 				return PlanUseItem(PATH_SCROLL_PORTAL, new Delay(500, state));
@@ -438,7 +435,7 @@ namespace Assistant {
 							// TODO: if need >= 10, it needs to play out a sequence of numberKey[i]'s
 							return new ShiftLeftClickAt(sourcePos, inputSpeed,
 								new PressKey(numberKeys[need], inputSpeed,
-								new PressKey(VirtualKeyCode.RETURN, inputSpeed,
+								new PressKey(Keys.Return, inputSpeed,
 								new LeftClickAt(targetPos, inputSpeed, 1,
 								new Delay(100,
 									state)))));

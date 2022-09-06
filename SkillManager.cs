@@ -1,13 +1,7 @@
-﻿using ExileCore;
-using ExileCore.PoEMemory.Components;
+﻿using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using WindowsInput.Native;
+using System.Windows.Forms;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -37,7 +31,7 @@ namespace Assistant {
 			if ( globalSkillUseTimer.IsRunning && globalSkillUseTimer.ElapsedMilliseconds < 133 ) return false;
 			return GetSettings().ForceSkillUse || (TryGetSkill(skillName, out ActorSkill skill) && !skill.IsOnCooldown);
 		}
-		public static bool TryUseSkill(string skillName, VirtualKeyCode key) {
+		public static bool TryUseSkill(string skillName, Keys key) {
 			if ( IsPaused() || !SkillIsReady(skillName) ) return false;
 			var api = GetGame();
 			if ( api == null ) return false;
@@ -62,7 +56,7 @@ namespace Assistant {
 			return false;
 		}
 
-		public static bool TryUseVaalSkill(string skillName, VirtualKeyCode key) {
+		public static bool TryUseVaalSkill(string skillName, Keys key) {
 			if ( IsPaused() ) return false;
 			if ( globalSkillUseTimer.IsRunning && globalSkillUseTimer.ElapsedMilliseconds < 133 ) return false;
 			if ( TryGetVaalSkill(skillName, out ActorVaalSkill skill) && skill.CurrVaalSouls == skill.VaalMaxSouls ) {

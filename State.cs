@@ -1,14 +1,13 @@
 ﻿using ExileCore;
 using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Elements.InventoryElements;
+using ExileCore.Shared;
 using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Forms;
-using WindowsInput;
-using WindowsInput.Native;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -211,34 +210,71 @@ namespace Assistant {
 	}
 
 	class InputState : State {
-		protected readonly static InputSimulator input = new InputSimulator();
 		protected readonly static bool debug = false;
 		protected InputState(State next = null) : base(next) { }
 		public override State OnTick() => Next;
+		// ExileApi Core is missing some things (right-click, control modifiers on mouse events)
+		// so we have to duplicate some things here:
+		protected const int MOUSEEVENTF_ABSOLUTE = 0x8000;
+		protected const int MOUSEEVENTF_MOVE = 0x0001;
+		protected const int MOUSEEVENTF_LEFTDOWN = 0x02;
+		protected const int MOUSEEVENTF_LEFTUP = 0x04;
+		protected const int MOUSEEVENTF_MIDDOWN = 0x0020;
+		protected const int MOUSEEVENTF_MIDUP = 0x0040;
+		protected const int MOUSEEVENTF_RIGHTDOWN = 0x0008;
+		protected const int MOUSEEVENTF_RIGHTUP = 0x0010;
+		protected static void LeftDown() => WinApi.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+		protected static void LeftUp() => WinApi.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+		protected static void RightDown() => WinApi.mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+		protected static void RightUp() => WinApi.mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+		protected static void MouseMoveRelative(int dx, int dy) => WinApi.mouse_event(MOUSEEVENTF_MOVE, dx, dy, 0, 0);
+		protected static Vector2 NormalizeScreenCoordsForWindows(Vector2 screenPos) {
+			var game = GetGame();
+			if ( game == null ) return Vector2.Zero;
+			var window = game.Window;
+			if ( window == null ) return Vector2.Zero;
+			var w = window.GetWindowRectangleTimeCache;
+			// TODO: measure this for performance, not sure if we need to cache PrimaryScreen.Bounds or not
+			var bounds = Screen.PrimaryScreen.Bounds;
+			float X = screenPos.X;
+			float Y = screenPos.Y;
+			if ( X > bounds.Width || X < 0 || Y > bounds.Height || Y < 0 ) {
+				return Vector2.Zero;
+			}
+			return new Vector2(
+					(w.Left + X) * 65535 / bounds.Width,
+					(w.Top + Y) * 65535 / bounds.Height);
+		}
+		protected static void MouseMoveAbsolute(Vector2 screenPos) {
+			if ( screenPos == Vector2.Zero ) return;
+			var pos = NormalizeScreenCoordsForWindows(screenPos);
+			if ( pos == Vector2.Zero ) return;
+			WinApi.mouse_event(Input.MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, (int)pos.X, (int)pos.Y, 0, 0);
+		}
 	}
 
 	class KeyState : InputState {
-		public readonly VirtualKeyCode Key;
-		protected KeyState(VirtualKeyCode key, State next = null) : base(next) => Key = key;
+		public readonly Keys Key;
+		protected KeyState(Keys key, State next = null) : base(next) => Key = key;
 	}
 
 	class KeyDown : KeyState {
-		public KeyDown(VirtualKeyCode key, State next = null) : base(key, next) { }
+		public KeyDown(Keys key, State next = null) : base(key, next) { }
 		public override State OnTick() {
 			if ( !AllowInputInChatBox && ChatIsOpen() ) return Next;
 			if ( debug ) Log($"KeyDown {Key}");
-			input.Keyboard.KeyDown(Key);
+			Input.KeyDown(Key);
 			return Next;
 		}
 		public override string Name => $"KeyDown({Key})";
 	}
 
 	class KeyUp : KeyState {
-		public KeyUp(VirtualKeyCode key, State next = null) : base(key, next) { }
+		public KeyUp(Keys key, State next = null) : base(key, next) { }
 		public override State OnTick() {
 			if ( !AllowInputInChatBox && ChatIsOpen() ) return Next;
 			if ( debug ) Log($"KeyUp {Key}");
-			input.Keyboard.KeyUp(Key);
+			Input.KeyUp(Key);
 			return Next;
 		}
 		public override string Name => $"KeyUp({Key})";
@@ -246,11 +282,11 @@ namespace Assistant {
 
 	class PressKey : KeyState {
 		private static Stopwatch pressTimer = Stopwatch.StartNew();
-		private static Dictionary<VirtualKeyCode, long> lastPressTime = new Dictionary<VirtualKeyCode, long>();
+		private static Dictionary<Keys, long> lastPressTime = new Dictionary<Keys, long>();
 		private readonly long throttle = long.MaxValue;
-		public PressKey(VirtualKeyCode key, uint duration, State next = null) : base(key,
+		public PressKey(Keys key, uint duration, State next = null) : base(key,
 				new KeyDown(key, new Delay(duration, new KeyUp(key, next)))) { }
-		public PressKey(VirtualKeyCode key, uint duration, long throttle, State next = null) : base(key,
+		public PressKey(Keys key, uint duration, long throttle, State next = null) : base(key,
 				new KeyDown(key, new Delay(duration, new KeyUp(key, next)))) {
 			this.throttle = throttle;
 		}
@@ -291,10 +327,12 @@ namespace Assistant {
 				Log($"MoveMouse: rejected {X} {Y}");
 				return null;
 			}
+			MouseMoveAbsolute(new Vector2(X, Y));
 			if ( debug ) Log($"MoveMouse: {X} {Y}");
-			input.Mouse.MoveMouseTo(
-					(w.Left + X) * 65535 / bounds.Width,
-					(w.Top + Y) * 65535 / bounds.Height);
+			// Input.SetCursorPos(new Vector2(X, Y));
+			// input.Mouse.MoveMouseTo(
+					// (w.Left + X) * 65535 / bounds.Width,
+					// (w.Top + Y) * 65535 / bounds.Height);
 			return Next;
 		}
 		public static MoveMouse SnapToGroundLabel(State next = null) {
@@ -311,7 +349,7 @@ namespace Assistant {
 		public LeftMouseDown(State next = null) : base(next) { }
 		public override State OnTick() {
 			if ( debug ) Log($"LeftMouseDown");
-			input.Mouse.LeftButtonDown();
+			Input.LeftDown();
 			return Next;
 		}
 	}
@@ -320,7 +358,7 @@ namespace Assistant {
 		public LeftMouseUp(State next = null) : base(next) { }
 		public override State OnTick() {
 			if ( debug ) Log($"LeftMouseUp");
-			input.Mouse.LeftButtonUp();
+			Input.LeftUp();
 			return Next;
 		}
 	}
@@ -345,7 +383,7 @@ namespace Assistant {
 		public RightMouseDown(State next = null) : base(next) { }
 		public override State OnTick() {
 			if ( debug ) Log($"RightButtonDown");
-			input.Mouse.RightButtonDown();
+			RightDown();
 			return Next;
 		}
 	}
@@ -354,7 +392,7 @@ namespace Assistant {
 		public RightMouseUp(State next = null) : base(next) { }
 		public override State OnTick() {
 			if ( debug ) Log($"RightButtonUp");
-			input.Mouse.RightButtonUp();
+			RightUp();
 			return Next;
 		}
 	}
@@ -376,30 +414,30 @@ namespace Assistant {
 		public CtrlRightClickAt(Vector2 pos, uint duration, State next = null) : this(pos.X, pos.Y, duration, next) { }
 		public CtrlRightClickAt(float x, float y, uint duration, State next = null) : base(
 				new MoveMouse(x, y, new Delay(duration, 
-					new KeyDown(VirtualKeyCode.LCONTROL, new Delay(duration,
+					new KeyDown(Keys.LControlKey, new Delay(duration,
 						new RightMouseDown(new Delay(duration,
 							new RightMouseUp(new Delay(duration,
-								new KeyUp(VirtualKeyCode.LCONTROL, next)))))))))) { }
+								new KeyUp(Keys.LControlKey, next)))))))))) { }
 	}
 	class CtrlLeftClickAt : InputState {
 		public CtrlLeftClickAt(Element item, uint duration, State next = null) : this(item?.GetClientRect().Center ?? Vector2.Zero, duration, next) { }
 		public CtrlLeftClickAt(Vector2 pos, uint duration, State next = null) : this(pos.X, pos.Y, duration, next) { }
 		public CtrlLeftClickAt(float x, float y, uint duration, State next = null) : base(
 				new MoveMouse(x, y, new Delay(duration, 
-					new KeyDown(VirtualKeyCode.LCONTROL, new Delay(duration,
+					new KeyDown(Keys.LControlKey, new Delay(duration,
 						new LeftMouseDown(new Delay(duration,
 							new LeftMouseUp(new Delay(duration,
-								new KeyUp(VirtualKeyCode.LCONTROL, next)))))))))) { }
+								new KeyUp(Keys.LControlKey, next)))))))))) { }
 	}
 	class ShiftLeftClickAt : InputState {
 		public ShiftLeftClickAt(Element item, uint duration, State next = null) : this(item?.GetClientRect().Center ?? Vector2.Zero, duration, next) { }
 		public ShiftLeftClickAt(Vector2 pos, uint duration, State next = null) : this(pos.X, pos.Y, duration, next) { }
 		public ShiftLeftClickAt(float x, float y, uint duration, State next = null) : base(
 				new MoveMouse(x, y, new Delay(duration, 
-					new KeyDown(VirtualKeyCode.LSHIFT, new Delay(duration,
+					new KeyDown(Keys.LShiftKey, new Delay(duration,
 						new LeftMouseDown(new Delay(duration,
 							new LeftMouseUp(new Delay(duration,
-								new KeyUp(VirtualKeyCode.LSHIFT, next)))))))))) { }
+								new KeyUp(Keys.LShiftKey, next)))))))))) { }
 	}
 
 }

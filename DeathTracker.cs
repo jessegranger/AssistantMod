@@ -1,14 +1,9 @@
 ﻿using ExileCore;
 using ExileCore.PoEMemory.Components;
-using ExileCore.Shared.Interfaces;
-using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using WindowsInput.Native;
 using static Assistant.Globals;
 
 namespace Assistant {

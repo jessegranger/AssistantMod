@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using WindowsInput.Native;
+using System.Windows.Forms;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -146,7 +146,7 @@ namespace Assistant {
 		public class Flask {
 			public static Stopwatch GlobalTimer = Stopwatch.StartNew();
 			public Stopwatch UseTimer = new Stopwatch();
-			public VirtualKeyCode Key;
+			public Keys Key;
 			public string PathName; // the last part of the full Path
 			public int CurrentCharges;
 			public int MaxCharges;
@@ -182,11 +182,11 @@ namespace Assistant {
 		}
 		private static readonly Flask[] flasks = new Flask[]
 		{
-						new Flask() { Key = VirtualKeyCode.VK_1 },
-						new Flask() { Key = VirtualKeyCode.VK_2 },
-						new Flask() { Key = VirtualKeyCode.VK_3 },
-						new Flask() { Key = VirtualKeyCode.VK_4 },
-						new Flask() { Key = VirtualKeyCode.VK_5 },
+						new Flask() { Key = Keys.D1 },
+						new Flask() { Key = Keys.D2 },
+						new Flask() { Key = Keys.D3 },
+						new Flask() { Key = Keys.D4 },
+						new Flask() { Key = Keys.D5 },
 		};
 		public static Flask GetFlask(int i) {
 			return flasks[i];
@@ -194,9 +194,9 @@ namespace Assistant {
 
 		public static void Initialise() {
 			// when the system as a whole comes un-paused refresh the flasks
-			OnRelease(VirtualKeyCode.PAUSE, RefreshFlaskMods);
+			OnRelease(Keys.Pause, RefreshFlaskMods);
 			// bind HOME to just refresh flasks again (maybe the user moves them around)
-			OnRelease(VirtualKeyCode.HOME, RefreshFlaskMods);
+			OnRelease(Keys.Home, RefreshFlaskMods);
 			PersistedText.Add(GetStatusText, (c) => ScreenRelativeToWindow(.305f, .983f), 0, Color.Orange);
 		}
 

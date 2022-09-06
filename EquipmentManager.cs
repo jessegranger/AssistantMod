@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Windows.Forms;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -28,7 +29,7 @@ namespace Assistant {
 			InventoryIndex.Flask
 		};
 		static EquipmentManager() {
-			OnRelease(WindowsInput.Native.VirtualKeyCode.VK_I, RefreshInventory);
+			OnRelease(Keys.I, RefreshInventory);
 		}
 		public static bool HasEquippedMod(string name) {
 			return hasExactMod.ContainsKey(name);

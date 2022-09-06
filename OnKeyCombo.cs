@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using WindowsInput.Native;
 
 namespace Assistant {
 
@@ -31,13 +30,13 @@ namespace Assistant {
 			}
 		}
 		public static void OnKeyCombo(string combo, Action action) {
-			VirtualKeyCode[] keys = combo.Select(ToVirtualKey).ToArray();
+			Keys[] keys = combo.Select(ToKeys).ToArray();
 			Run(PlanKeyCombo(combo, keys, action));
 		}
-		public static void OnRelease(VirtualKeyCode key, Action action) {
-			Run(PlanKeyCombo(ToString(key), new VirtualKeyCode[] { key }, action));
+		public static void OnRelease(Keys key, Action action) {
+			Run(PlanKeyCombo(ToString(key), new Keys[] { key }, action));
 		}
-		private static State PlanKeyCombo(string combo, VirtualKeyCode[] keys, Action action) {
+		private static State PlanKeyCombo(string combo, Keys[] keys, Action action) {
 			uint curStep = 0;
 			bool downBefore = false;
 			Stopwatch sinceLastRelease = new Stopwatch();
@@ -60,12 +59,10 @@ namespace Assistant {
 						return doReset(downNow, state);
 					}
 				} else if ( sinceLastRelease.ElapsedMilliseconds > 1000 ) {
-					// Log($"Combo-{combo} expired, resetting.");
+					// Combo expired: resetting
 					return doReset(downNow, state);
 				} else {
-					var asKey = ToKey(curKey);
-					if ( GetPressedKeys().Any(k => k != asKey) ) {
-						// if( curStep > 0 ) Log($"Combo-{combo} failed, expected {ToString(curKey)}");
+					if ( GetPressedKeys().Any(k => k != curKey) ) {
 						return doReset(downNow, state);
 					}
 				}

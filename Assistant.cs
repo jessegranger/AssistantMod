@@ -8,7 +8,7 @@ using ExileCore.PoEMemory.Elements;
 using ExileCore.Shared.Enums;
 using SharpDX;
 using System.Diagnostics;
-using WindowsInput.Native;
+// using WindowsInput.Native;
 using ExileCore.PoEMemory.Elements.InventoryElements;
 using static Assistant.Globals;
 using ExileCore.PoEMemory;
@@ -80,7 +80,7 @@ namespace Assistant {
 						&& !HasBuff(e, "infernal_cry"));
 				if( hostile != default ) {
 					Log($"Infernal cry re: {hostile.Path} {hostile.IsAlive} {hostile.GetComponent<Life>().CurHP} {hostile.DistancePlayer:F2}");
-					SkillManager.TryUseSkill("AbyssalCry", ToVirtualKey(Settings.UseInfernalCry.Value));
+					SkillManager.TryUseSkill("AbyssalCry", Settings.UseInfernalCry.Value);
 					return new Delay(1000, state);
 				}
 				return new Delay(300, state);
@@ -112,7 +112,7 @@ namespace Assistant {
 			Run((state) => {
 				var area = GetGame()?.Area;
 				if ( IsInMap(area) && (Settings.UseDivineBlessing?.Enabled ?? false) && !HasBuff("grace_period") ) {
-					var key = ToVirtualKey(Settings.UseDivineBlessing.Value);
+					var key = Settings.UseDivineBlessing.Value;
 					foreach ( var tup in blessingData ) {
 						if ( tup.Item1.Value && (!HasBuff(tup.Item3)) && SkillManager.TryUseSkill(tup.Item2, key) ) {
 							break;
@@ -137,14 +137,14 @@ namespace Assistant {
 			ConfigureHotkey(Settings.StashDeposit, () => Inventory.StashDeposit());
 			ConfigureHotkey(Settings.StashRestock, () => Inventory.RestockFromStash());
 
-			OnRelease(VirtualKeyCode.F10, RollStashItem);
-			OnRelease(VirtualKeyCode.F6, Test.RunAll);
-			OnRelease(VirtualKeyCode.F5, () => ChatCommand("/hideout"));
+			OnRelease(Keys.F10, RollStashItem);
+			OnRelease(Keys.F6, Test.RunAll);
+			OnRelease(Keys.F5, () => ChatCommand("/hideout"));
 
 			Run((state) => {
 				NormalInventoryItem item;
 				if ( ! BackpackIsOpen() ) return state;
-				if ( IsKeyDown(VirtualKeyCode.NUMPAD6) ) {
+				if ( IsKeyDown(Keys.NumPad6) ) {
 					var free = Inventory.GetFreeSlot(1, 1); // TODO: use item actual size
 					if ( free == Vector2.Zero ) {
 						DrawTextAtPlayer("No free slot.");
@@ -154,7 +154,7 @@ namespace Assistant {
 					if( item != default ) {
 						return new CtrlLeftClickAt(item, 30, new Delay(100, state));
 					}
-				} else if ( IsKeyDown(VirtualKeyCode.NUMPAD4)) {
+				} else if ( IsKeyDown(Keys.NumPad4)) {
 					var tradeWindow = GetGame().IngameState.IngameUi.Children.ElementAtOrDefault(70);
 					if( tradeWindow != default && tradeWindow.IsVisible ) {
 						Element tradeButton = tradeWindow.Children[4];
@@ -196,7 +196,7 @@ namespace Assistant {
 			});
 
 			Run((state) => {
-				if( IsKeyDown(VirtualKeyCode.NUMPAD0) ) {
+				if( IsKeyDown(Keys.NumPad0) ) {
 					var items = Empty<NormalInventoryItem>();
 					if ( StashIsOpen() ) {
 						items = items.Concat(StashItems());
@@ -321,7 +321,7 @@ namespace Assistant {
 
 			GameController.Area.OnAreaChange += Area_OnAreaChange;
 			timeInZone.Start();
-			OnRelease(VirtualKeyCode.PAUSE, () => {
+			OnRelease(Keys.Pause, () => {
 				Paused = !Paused;
 				if ( !Paused ) {
 					ResetRegen();
@@ -357,13 +357,13 @@ namespace Assistant {
 
 			Run(PlanLootKey(Settings.ClickNearestLabel));
 
-			OnKeyCombo(",20", () => Run(new KeyDown(VirtualKeyCode.LSHIFT,
+			OnKeyCombo(",20", () => Run(new KeyDown(Keys.LShiftKey,
 				new LeftClick(40, 20, 
-				new KeyUp(VirtualKeyCode.LSHIFT)))));
+				new KeyUp(Keys.LShiftKey)))));
 
-			OnKeyCombo(",4", () => Run(new KeyDown(VirtualKeyCode.LSHIFT,
+			OnKeyCombo(",4", () => Run(new KeyDown(Keys.LShiftKey,
 				new LeftClick(40, 4, 
-				new KeyUp(VirtualKeyCode.LSHIFT)))));
+				new KeyUp(Keys.LShiftKey)))));
 
 			OnKeyCombo(",l22", () => Run(PlanToLinkItem(2, 2)));
 			OnKeyCombo(",l31", () => Run(PlanToLinkItem(3, 1)));
@@ -521,8 +521,7 @@ namespace Assistant {
 				var maxHp = life.MaxHP - life.TotalReservedHP;
 				var maxEffHp = maxHp + life.MaxES;
 				if ( gain > (maxEffHp * .4f) ) {
-					var key = ToVirtualKey(Settings.UseTemporalRift.Value);
-					SkillManager.TryUseSkill("TemporalRift", key);
+					SkillManager.TryUseSkill("TemporalRift", Settings.UseTemporalRift.Value);
 				}
 				return state;
 			});
@@ -563,8 +562,7 @@ namespace Assistant {
 			});
 		}
 
-		internal State PlanMultiKey(Keys mainKey, params Keys[] otherKeys) => PlanMultiKey(ToVirtualKey(mainKey), otherKeys.Select(ToVirtualKey).ToArray());
-		internal State PlanMultiKey(VirtualKeyCode mainKey, params VirtualKeyCode[] otherKeys) {
+		internal State PlanMultiKey(Keys mainKey, params Keys[] otherKeys) {
 			// press the mainKey, this code presses all the otherKeys
 			bool downBefore = false;
 			KeyUp[] keyUps = otherKeys.Select(k => new KeyUp(k)).ToArray();
@@ -584,10 +582,10 @@ namespace Assistant {
 
 		public void EnableMovementKeys(ToggleNode setting) => Run((state) => {
 			if ( !(setting?.Value ?? false) ) return state;
-			bool left = IsKeyDown(VirtualKeyCode.LEFT);
-			bool right = IsKeyDown(VirtualKeyCode.RIGHT);
-			bool up = IsKeyDown(VirtualKeyCode.UP);
-			bool down = IsKeyDown(VirtualKeyCode.DOWN);
+			bool left = IsKeyDown(Keys.Left);
+			bool right = IsKeyDown(Keys.Right);
+			bool up = IsKeyDown(Keys.Up);
+			bool down = IsKeyDown(Keys.Down);
 			// we cant just add up vector components like normal because of the skewed perspective, so we hack in all 8 corners
 			// this lets the diagonals align nicely with the game corridors
 			Vector2 motion = (up && left) ? new Vector2(.36f, .27f) :
@@ -630,7 +628,7 @@ namespace Assistant {
 				}
 				if( needShift && !didShift ) {
 					didShift = true;
-					return Inventory.PlanUseStashItem(PATH_FUSING, new KeyDown(VirtualKeyCode.LSHIFT, state));
+					return Inventory.PlanUseStashItem(PATH_FUSING, new KeyDown(Keys.LShiftKey, state));
 				}
 				bool matchedOne = false;
 				bool matchedTwo = linksInGroupTwo == 0;
@@ -868,7 +866,7 @@ namespace Assistant {
 			if ( !IsInMap(GameController.Area) ) return;
 			if ( (!HasBuff(auraBuffName))
 					|| TryGetBuffValue(stageBuffName, out int stage) && stage == 50 && NearbyEnemies(100).Any(e => e.Rarity > MonsterRarity.Rare) ) {
-				SkillManager.TryUseSkill(skillName, ToVirtualKey(setting.Value));
+				SkillManager.TryUseSkill(skillName, setting.Value);
 			}
 		}
 

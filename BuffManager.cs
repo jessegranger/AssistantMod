@@ -1,13 +1,8 @@
 ﻿using ExileCore;
-using ExileCore.PoEMemory.Components;
-using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Nodes;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using WindowsInput.Native;
+using System.Windows.Forms;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -20,7 +15,7 @@ namespace Assistant {
 			api = game;
 			Graphics = gfx;
 			Settings = settings;
-			OnRelease(VirtualKeyCode.PAUSE, () => Paused = !Paused);
+			OnRelease(Keys.Pause, () => Paused = !Paused);
 			// PersistedText.Add(GetStatusText, (c) => ScreenRelativeToWindow(.72f, .85f), 0);
 		}
 
@@ -64,8 +59,7 @@ namespace Assistant {
 					}
 					if ( needsBuff ) {
 						if ( !HasBuff(buff.BuffName) ) {
-							var key = ToVirtualKey(buff.Node.Value);
-							SkillManager.TryUseVaalSkill(buff.SkillName, key);
+							SkillManager.TryUseVaalSkill(buff.SkillName, buff.Node.Value);
 							// } else { status += "Has Buff.";
 						}
 						// } else { status += "Not needed.";
@@ -83,8 +77,7 @@ namespace Assistant {
 				if ( HasBuff(buff.BuffName) ) {
 					continue;
 				}
-				var key = ToVirtualKey(buff.Node.Value);
-				SkillManager.TryUseSkill(buff.SkillName, key);
+				SkillManager.TryUseSkill(buff.SkillName, buff.Node.Value);
 			}
 			foreach ( var buff in buffsToClear ) {
 				if ( !(buff.Node?.Enabled ?? false) ) continue;
@@ -93,8 +86,7 @@ namespace Assistant {
 					continue;
 				}
 				if ( !HasBuff(buff.BuffName) ) continue;
-				var key = ToVirtualKey(buff.Node.Value);
-				PressKey(key, 40, 1000);
+				Globals.PressKey(buff.Node.Value, 40, 1000);
 			}
 		}
 	}

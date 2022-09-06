@@ -11,10 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using WindowsInput.Native;
 
 namespace Assistant {
 	public static partial class Globals {
@@ -30,7 +27,7 @@ namespace Assistant {
 			Settings = settings;
 			IsInitialised = true;
 			Run(TrackMovement);
-			OnRelease(VirtualKeyCode.PAUSE, TogglePause);
+			OnRelease(Keys.Pause, TogglePause);
 			// Machine.EnableLogging((s) => Log(s));
 		}
 
@@ -504,20 +501,16 @@ namespace Assistant {
 		[DllImport("user32.dll")] public static extern short GetAsyncKeyState(Keys key);
 		[DllImport("user32.dll")] private static extern short VkKeyScanA(char ch);
 		public static bool IsKeyDown(Keys key) => GetAsyncKeyState(key) < 0;
-		public static bool IsKeyDown(VirtualKeyCode key) => IsKeyDown(ToKey(key));
-		public static VirtualKeyCode ToVirtualKey(Keys Key) => (VirtualKeyCode)(Key & Keys.KeyCode);
-		public static VirtualKeyCode ToVirtualKey(char c) => (VirtualKeyCode)VkKeyScanA(c);
-		public static VirtualKeyCode ToVirtualKey(string s) => (VirtualKeyCode)VkKeyScanA(s[0]);
-		public static Keys ToKey(VirtualKeyCode Key) => (Keys)Key;
+		public static Keys ToKeys(char c) => (Keys)VkKeyScanA(c);
+		public static Keys ToKeys(string s) => (Keys)VkKeyScanA(s[0]);
 
-		public static void PressKey(VirtualKeyCode Key, uint duration, long throttle) {
+		public static void PressKey(Keys Key, uint duration, long throttle) {
 			Run(new PressKey(Key, duration, throttle, null));
 		}
-		public static void PressKey(VirtualKeyCode Key, uint duration) {
+		public static void PressKey(Keys Key, uint duration) {
 			Run(new PressKey(Key, duration, null));
 		}
 
-		public static string ToString(VirtualKeyCode key) => Enum.GetName(typeof(VirtualKeyCode), key);
 		public static string ToString(Keys key) => Enum.GetName(typeof(Keys), key);
 		public static string ToString(GameStat stat) => Enum.GetName(typeof(GameStat), stat);
 
@@ -528,9 +521,9 @@ namespace Assistant {
 		public static State PlanChatCommand(string v, State next = null) {
 			State start = State.From(() => { AllowInputInChatBox = true; }); // this has terrible race conditions where the other running states can press keys in the chat
 			start
-					.Then(new PressKey(VirtualKeyCode.RETURN, 30))
-					.Then(v.Select((c) => new PressKey(ToVirtualKey(c), 10)).ToArray())
-					.Then(new PressKey(VirtualKeyCode.RETURN, 30))
+					.Then(new PressKey(Keys.Return, 30))
+					.Then(v.Select((c) => new PressKey(ToKeys(c), 10)).ToArray())
+					.Then(new PressKey(Keys.Return, 30))
 					.Then(() => { AllowInputInChatBox = false; })
 					.Then(next);
 			return start;
