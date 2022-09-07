@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{4DEE86D7-5666-4B10-93C2-0CCEEF3799E5}</ProjectGuid>
+    <ProjectGuid>{57CBD2BB-F8B2-4592-9CB5-A9F454565DA0}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Assistant</RootNamespace>
@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\..\..\PoeHelper\Plugins\Compiled\Assistant\</OutputPath>
+    <OutputPath>..\..\..\PoeHelper\Plugins\Compiled\Assistant\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -26,7 +26,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\..\..\..\PoeHelper\Plugins\Compiled\Assistant\</OutputPath>
+    <OutputPath>..\..\..\PoeHelper\Plugins\Compiled\Assistant\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -51,21 +51,20 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ImGui.NET, Version=1.71.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\PoeHelper\ImGui.NET.dll</HintPath>
+    <Reference Include="ImGui.NET">
+      <HintPath>..\..\..\PoeHelper\ImGui.NET.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1">
-      <HintPath>..\..\..\..\PoeHelper\SharpDX.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="SharpDX">
+      <HintPath>..\..\..\PoeHelper\SharpDX.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX.Mathematics, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1">
-      <HintPath>..\..\..\..\PoeHelper\SharpDX.Mathematics.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="SharpDX.Mathematics">
+      <HintPath>..\..\..\PoeHelper\SharpDX.Mathematics.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -85,7 +84,6 @@
     <Compile Include="FlaskManager.cs" />
     <Compile Include="FocusManager.cs" />
     <Compile Include="Globals.cs" />
-    <Compile Include="InputManager.cs" />
     <Compile Include="Inventory.cs" />
     <Compile Include="ItemQuery.cs" />
     <Compile Include="MovingAverage.cs" />
