@@ -292,7 +292,7 @@ namespace Assistant {
 			Keys.D8,
 			Keys.D9,
 		};
-		internal static uint inputSpeed = 40;
+		internal static uint inputSpeed = 16;
 
 		internal static State PlanTeleportHome(State next = null) {
 			return State.From("TeleportHome", (state) => {

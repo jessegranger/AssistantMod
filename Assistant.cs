@@ -72,7 +72,7 @@ namespace Assistant {
 			// Infernal Cry
 			Run((state) => {
 				if ( !(Settings.UseInfernalCry?.Enabled ?? false) ) return state;
-				var hostile = NearbyEnemies(200)
+				var hostile = NearbyEnemies(50)
 					.FirstOrDefault(e => IsAlive(e)
 						&& e.IsHostile
 						&& e.IsTargetable
