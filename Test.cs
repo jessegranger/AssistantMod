@@ -230,7 +230,7 @@ namespace Assistant {
 								continue;
 							}
 							var modRecord = tiers[mod.Level - 1];
-							if ( modRecord != default ) {
+							if ( modRecord != null ) {
 								// Log($"Mod Record: [{modRecord.AffixType}] \"{modRecord.UserFriendlyName}\" {modRecord.Domain} {modRecord.StatRange[0]} {modRecord.StatNames[0]} Tags: {string.Join(",", modRecord.Tags.Select(tag => tag.Key))}");
 								tags = string.Join(", ", modRecord.Tags.Select(tag => tag.Key));
 								affixType = modRecord.AffixType;

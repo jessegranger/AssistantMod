@@ -78,7 +78,7 @@ namespace Assistant {
 						&& e.IsTargetable
 						&& e.Rarity >= MonsterRarity.Rare
 						&& !HasBuff(e, "infernal_cry"));
-				if( hostile != default ) {
+				if( hostile != null ) {
 					Log($"Infernal cry re: {hostile.Path} {hostile.IsAlive} {hostile.GetComponent<Life>().CurHP} {hostile.DistancePlayer:F2}");
 					SkillManager.TryUseSkill("AbyssalCry", Settings.UseInfernalCry.Value);
 					return new Delay(1000, state);
@@ -151,12 +151,12 @@ namespace Assistant {
 						return state;
 					}
 					item = StashItems().FirstOrDefault();
-					if( item != default ) {
+					if( item != null ) {
 						return new CtrlLeftClickAt(item, 30, new Delay(100, state));
 					}
 				} else if ( IsKeyDown(Keys.NumPad4)) {
 					var tradeWindow = GetGame().IngameState.IngameUi.Children.ElementAtOrDefault(70);
-					if( tradeWindow != default && tradeWindow.IsVisible ) {
+					if( tradeWindow != null && tradeWindow.IsVisible ) {
 						Element tradeButton = tradeWindow.Children[4];
 						Element cardSlot = tradeWindow.Children[5];
 						bool isTradeButtonEnabled = tradeButton.BorderColor.G == 46;
@@ -167,13 +167,13 @@ namespace Assistant {
 							return new CtrlLeftClickAt(cardSlot, 30, new Delay(200, state));
 						} else {
 							var card = BackpackItems().FirstOrDefault(i => IsValid(i) && i.Item.Path.StartsWith("Metadata/Items/DivinationCards") && IsFullStack(i));
-							if( card != default ) {
+							if( card != null ) {
 								return new CtrlLeftClickAt(card, 30, new Delay(200, state));
 							}
 						}
 					} else {
 						item = BackpackItems().FirstOrDefault();
-						if( item != default ) {
+						if( item != null ) {
 							return new CtrlLeftClickAt(item, 30, new Delay(100, state));
 						}
 					}
