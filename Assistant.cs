@@ -23,21 +23,29 @@ namespace Assistant {
 		}
 		public bool Paused { get; set; } = true;
 		public override bool Initialise() {
+			Log("Globals: Init...");
 			Globals.Initialise(GameController, Graphics, Settings);
+			Log("Inventory: Init...");
 			Inventory.Initialise();
+			Log("FlaskManager: Init...");
 			FlaskManager.Initialise();
+			Log("SkillManager: Init...");
 			SkillManager.Initialise();
+			Log("DeathTracker: Init...");
 			DeathTracker.Initialise();
+			Log("Navigation: Init...");
 			Navigation.Initialise();
 
-			BuffManager.Initialise(GameController, Graphics, Settings);
+			Log("BuffManager: Init...");
+			BuffManager.Initialise();
 			BuffManager.MaintainVaalBuff(Settings.UseVaalGrace, "vaal_grace", "vaal_aura_dodge");
 			BuffManager.MaintainVaalBuff(Settings.UseVaalHaste, "vaal_haste", "vaal_aura_speed");
+			BuffManager.MaintainVaalBuff(Settings.UseVaalColdSnap, "new_vaal_cold_snap", "vaal_cold_snap_degen", () => NearbyEnemies(150).Any(e => IsAlive(e) && e.IsTargetable && e.Rarity >= MonsterRarity.Rare));
 			BuffManager.MaintainVaalBuff(Settings.UseVaalDiscipline, "vaal_discipline", "vaal_aura_energy_shield", () => IsLowES(GameController.Player));
 
 			BuffManager.MaintainBuff(Settings.UseBloodRage, "BloodRage", "blood_rage", () => IsInMap(GameController.Area) && IsFullEnough(GameController.Player));
 
-			BuffManager.MaintainBuff(Settings.UseSteelskin, "QuickGuard", "quick_guard", () => IsInMap(GameController.Area) && IsMissingLife(GameController.Player, 100));
+			BuffManager.MaintainBuff(Settings.UseSteelskin, "QuickGuard", "quick_guard", () => IsInMap(GameController.Area) && IsMissingLife(GameController.Player, 100) || HasBuff("bleeding"));
 
 			BuffManager.MaintainBuff(Settings.UseBerserk, "Berserk", "berserk", () => IsInMap(GameController.Area) && HasEnoughRage(25));
 
@@ -45,7 +53,7 @@ namespace Assistant {
 
 			// Withering Step
 			BuffManager.MaintainBuff(Settings.UseWitheringStep, "Slither", "slither", () => IsInMap(GameController.Area)
-				&& NearbyEnemies(350).Any(e => e.Rarity >= MonsterRarity.Rare && GetWitherStacks(e) < 7)
+				&& NearbyEnemies(150).Any(e => e.Rarity >= MonsterRarity.Rare && GetWitherStacks(e) < 7)
 			);
 
 			// Plague Bearer
@@ -70,7 +78,7 @@ namespace Assistant {
 				() => IsMissingLife(GameController.Player, 1000));
 
 			// Infernal Cry
-			Run((state) => {
+			Run("SkillInfernalCry", (state) => {
 				if ( !(Settings.UseInfernalCry?.Enabled ?? false) ) return state;
 				var hostile = NearbyEnemies(50)
 					.FirstOrDefault(e => IsAlive(e)
@@ -109,7 +117,7 @@ namespace Assistant {
 				new Tuple<ToggleNode, string, string>(Settings.UseZealotryBlessing, "SpellDamageAura", "player_aura_spell_damage"),
 				new Tuple<ToggleNode, string, string>(Settings.UseMalevolenceBlessing, "DamageOverTimeAura", "player_aura_damage_over_time"),
 			};
-			Run((state) => {
+			Run("SkillBlessing", (state) => {
 				var area = GetGame()?.Area;
 				if ( IsInMap(area) && (Settings.UseDivineBlessing?.Enabled ?? false) && !HasBuff("grace_period") ) {
 					var key = Settings.UseDivineBlessing.Value;
@@ -128,8 +136,6 @@ namespace Assistant {
 
 			// BuffManager.MaintainVaalBuff(Settings.UseVaalImpurityOfIce, "cold_impurity", "cold_impurity_buff", VirtualKeyCode.VK_Q);
 
-
-			PersistedText.Add(GetTimeInZone, (c) => ScreenRelativeToWindow(.319f, .960f), 0, Color.Orange);
 
 			// InputManager.OnRelease(VirtualKeyCode.ESCAPE, () => Paused = true);
 			// InputManager.OnRelease(VirtualKeyCode.OEM_MINUS, () => Inventory.StashAll());
@@ -155,7 +161,7 @@ namespace Assistant {
 						return new CtrlLeftClickAt(item, 30, new Delay(100, state));
 					}
 				} else if ( IsKeyDown(Keys.NumPad4)) {
-					var tradeWindow = GetGame().IngameState.IngameUi.Children.ElementAtOrDefault(70);
+					var tradeWindow = GetGame().IngameState.IngameUi.CardTradePanel;
 					if( tradeWindow != null && tradeWindow.IsVisible ) {
 						Element tradeButton = tradeWindow.Children[4];
 						Element cardSlot = tradeWindow.Children[5];
@@ -319,8 +325,6 @@ namespace Assistant {
 
 			// InputManager.OnRelease(VirtualKeyCode.F2, () => { if (showRecipe = !showRecipe) currentRecipe.Reset().Add(GameController.Game.IngameState.IngameUi.StashElement); });
 
-			GameController.Area.OnAreaChange += Area_OnAreaChange;
-			timeInZone.Start();
 			OnRelease(Keys.Pause, () => {
 				Paused = !Paused;
 				if ( !Paused ) {
@@ -352,6 +356,48 @@ namespace Assistant {
 			Settings.UseMultiKey2.OnValueChanged += refreshMultiKey;
 			Settings.UseMultiKey3.OnValueChanged += refreshMultiKey;
 			refreshMultiKey();
+
+			// keep an array of the last time the autokey cast the 2,4,8,16 second spells
+			long[] timeOfLastCast = new long[4] { 0, 0, 0, 0 };
+			Run((state) => {
+				// listen for the autokey setting/feature:
+				if ( IsPaused() ||  !(Settings.UseAutoKey?.Enabled ?? false) ) return state;
+				if ( IsKeyDown(Settings.UseAutoKey.Value) ) {
+					long keyDownTime = Time.ElapsedMilliseconds;
+					// when the autokey goes down, the main key goes down and stays down
+					if ( Settings.AutoKeyElse.Enabled ) Run(new KeyDown(Settings.AutoKeyElse, null));
+					return State.From("AutoKeyIsDown", (inner) => {
+						// this inner state runs only while the autokey is pressed:
+						if ( IsPaused() || !IsKeyDown(Settings.UseAutoKey.Value) ) {
+							// when the autokey comes up, the main key comes up
+							if ( Settings.AutoKeyElse.Enabled ) return new KeyUp(Settings.AutoKeyElse, state);
+							else return state;
+						}
+						long now = Time.ElapsedMilliseconds;
+						long[] elapsed = timeOfLastCast.Select(v => now - v).ToArray();
+						// cast the 2,4,8,16 spells
+						if ( elapsed[3] >= 16000 && Settings.AutoKey16Second.Enabled ) {
+							Log($"{now} AutoKey: PressKey {Settings.AutoKey16Second.Value} after {elapsed[3]} ms");
+							timeOfLastCast[3] = now;
+							return new PressKey(Settings.AutoKey16Second.Value, 300, inner);
+						} else if ( elapsed[2] >= 8301 && Settings.AutoKey8Second.Enabled ) {
+							Log($"{now} AutoKey: PressKey {Settings.AutoKey8Second.Value} after {elapsed[2]} ms");
+							timeOfLastCast[2] = now;
+							return new PressKey(Settings.AutoKey8Second.Value, 300, inner);
+						} else if ( elapsed[1] >= 4301 && Settings.AutoKey4Second.Enabled ) {
+							Log($"{now} AutoKey: PressKey {Settings.AutoKey4Second.Value} after {elapsed[1]} ms");
+							timeOfLastCast[1] = now;
+							return new PressKey(Settings.AutoKey4Second.Value, 300, inner);
+						} else if ( elapsed[0] >= 2301 && Settings.AutoKey2Second.Enabled ) {
+							Log($"{now} AutoKey: PressKey {Settings.AutoKey2Second.Value} after {elapsed[0]} ms");
+							timeOfLastCast[0] = now;
+							return new PressKey(Settings.AutoKey2Second.Value, 300, inner);
+						}
+						return inner;
+					});
+				}
+				return state;
+			});
 
 			EnableMovementKeys(Settings.UseArrowKeys);
 
@@ -385,6 +431,10 @@ namespace Assistant {
 				Log($"Cursor at: {item?.Item?.Path ?? "null"}");
 
 				Run(State.From("Rolling Map", (state) => {
+					if ( IsPaused() ) {
+						Log("Canceled by Pause key.");
+						return null;
+					}
 					if ( !BackpackIsOpen() ) {
 						Log($"Canceled: backpack is closed.");
 						return null;
@@ -446,9 +496,10 @@ namespace Assistant {
 					int packSize = 0;
 					foreach(var mod in mods.ItemMods) {
 						if ( // any of the banlisted mods:
-							mod.Group.Equals("MapPlayerMaxResists")
-							// || mod.Group.Equals("MapMonsterPhysicalReflection")
-							|| mod.Name.Equals("MapPlayerNoLifeESRegenMapWorlds") ) {
+							// mod.Name.StartsWith("MapPlayerMaxResists") ||
+							// mod.Name.StartsWith("MapMonsterPhysicalReflection") ||
+							mod.Name.StartsWith("MapMonsterElementalReflection") ||
+							mod.Name.StartsWith("MapPlayerNoLifeESRegen") ) {
 							Log($"Target map has bad mod: {mod.DisplayName}, scouring.");
 							return Inventory.PlanUseStashItemOnItem(PATH_SCOUR, item, 1, doReset);
 						}
@@ -480,6 +531,17 @@ namespace Assistant {
 					foreach(var ent in NearbyEnemies().Where(IsValid)) {
 						DrawTextAtEnt(ent, $"D:{Vector3.Distance(pos, ent.Pos):F0}");
 					}
+				}
+				return state;
+			});
+
+			Run((state) => {
+				if ( IsPaused() || !(Settings.DebugNearbyEnemies) ) return state;
+				foreach(var ent in NearbyEnemies() ) {
+					var props = ent.GetComponent<ObjectMagicProperties>();
+					if( ent.Rarity == MonsterRarity.Rare )
+					DrawTextAtEnt(ent, $"Mods: {string.Join(",", props?.Mods)}");
+					// DrawTextAtEnt(ent, $"[0x15c] {props?.Fieldx15c}");
 				}
 				return state;
 			});
@@ -537,17 +599,17 @@ namespace Assistant {
 			};
 
 			return State.From((resume) => {
-			long dt = Math.Max(1, xpTimer.ElapsedMilliseconds - lastFrameTime);
-			lastFrameTime += dt;
+				long dt = Math.Max(1, xpTimer.ElapsedMilliseconds - lastFrameTime);
+				lastFrameTime += dt;
 
-			if ( !Settings.ShowXPRate.Value ) return resume;
-			var game = GetGame();
-			var player = game?.Player;
-			if ( !IsValid(player) ) return resume;
-			var p = player.GetComponent<Player>();
-			if ( xpLastFrame == -1 ) xpLastFrame = p.XP;
-			else {
-				long xpGain = (p.XP - xpLastFrame);
+				if ( !Settings.ShowXPRate.Value ) return resume;
+				var game = GetGame();
+				var player = game?.Player;
+				if ( !IsValid(player) ) return resume;
+				var p = player.GetComponent<Player>();
+				if ( xpLastFrame == -1 ) xpLastFrame = p.XP;
+				else {
+					long xpGain = (p.XP - xpLastFrame);
 					xpLastFrame = p.XP;
 					xpPerMS.Add(xpGain / dt);
 				}
@@ -556,7 +618,7 @@ namespace Assistant {
 					var pctPerMin = (xpPerMS.Value * 1000 * 60 * 60) / xpToNextLevel[p.Level];
 					var msToLevel = xpToLevel / xpPerMS.Value;
 					var hrToLevel = Math.Min(9999, msToLevel / (1000 * 60 * 60));
-					Graphics.DrawText($"{hrToLevel:F2} hrs {pctPerMin * 1000:F2}%/hr", ScreenRelativeToWindow(.68f, .96f), FontAlign.Right);
+					DrawBottomRightText($"{hrToLevel:F2} hrs {pctPerMin * 1000:F2}%/hr", Color.Orange);
 				}
 				return resume;
 			});
@@ -607,43 +669,42 @@ namespace Assistant {
 			bool needShift = linksInGroupOne == 6;
 			bool didShift = false;
 			return State.From("LinkItem", (state) => {
-				if( ! StashIsOpen() ) {
+				if ( !StashIsOpen() ) {
 					Log($"Stash is closed.");
 					return next;
 				}
 				var item = StashItems().Where(i => IsValid(i) && !i.Item.HasComponent<Stack>()).FirstOrDefault();
-				if( ! IsValid(item) ) {
+				if ( !IsValid(item) ) {
 					Log($"LinkItem: invalid target item.");
 					return next;
 				}
 				Log($"Target item: {item.Item.Path}");
 				var sockets = item.Item.GetComponent<Sockets>();
-				if( sockets == null ) {
+				if ( sockets == null ) {
 					Log($"LinkItem: item has no Sockets component.");
 					return next;
 				}
-				if( sockets.NumberOfSockets < linksInGroupOne || sockets.NumberOfSockets < linksInGroupTwo ) {
+				if ( sockets.NumberOfSockets < linksInGroupOne || sockets.NumberOfSockets < linksInGroupTwo ) {
 					Log($"LinkItem: item cannot support {Math.Max(linksInGroupOne, linksInGroupTwo)} links (has {sockets.NumberOfSockets})");
 					return next;
 				}
-				if( needShift && !didShift ) {
+				if ( needShift && !didShift ) {
 					didShift = true;
 					return Inventory.PlanUseStashItem(PATH_FUSING, new KeyDown(Keys.LShiftKey, state));
 				}
 				bool matchedOne = false;
 				bool matchedTwo = linksInGroupTwo == 0;
-				foreach(var links in sockets.Links) {
+				foreach ( var links in sockets.Links ) {
 					Log($"Links: {links.Length}");
-					if( (!matchedOne) && links.Length == linksInGroupOne ) {
+					if ( (!matchedOne) && links.Length == linksInGroupOne ) {
 						Log($"Matched group one ({linksInGroupOne})");
 						matchedOne = true;
-					}
-					else if( (!matchedTwo) && links.Length == linksInGroupTwo ) {
+					} else if ( (!matchedTwo) && links.Length == linksInGroupTwo ) {
 						Log($"Matched group two ({linksInGroupTwo}))");
 						matchedTwo = true;
 					}
 				}
-				if( matchedOne && matchedTwo ) {
+				if ( matchedOne && matchedTwo ) {
 					Log($"Complete.");
 					return next;
 				}
@@ -653,11 +714,6 @@ namespace Assistant {
 		}
 
 
-		private Stopwatch timeInZone = new Stopwatch();
-		private void Area_OnAreaChange(AreaInstance obj) {
-			Log(string.Format("Leaving Zone after {0}", timeInZone.Elapsed.ToString(@"mm\:ss")));
-			timeInZone.Restart();
-		}
 
 
 		private ChaosRecipe currentRecipe = new ChaosRecipe();
@@ -703,7 +759,6 @@ namespace Assistant {
 
 
 
-		private string GetTimeInZone() => "(" + timeInZone.Elapsed.ToString(@"mm\:ss") + ")";
 		private string GetQuestNotes() {
 			var area = GameController.Area.CurrentArea;
 			string ret = $"{area.Name} - "; // string.Format("{0}{1} - ", (Paused ? "[Paused] " : ""), area.Name);
@@ -743,11 +798,11 @@ namespace Assistant {
 			} else {
 				ret += "No Notes.";
 			}
-			return ret + " (" + timeInZone.Elapsed.ToString(@"mm\:ss") + ")";
+			return ret;
 		}
 		// sampled over 1000 frames @ 60fps is about 14 seconds
 		// sampled over 250 frames @ 60 fps is "recently"
-	
+
 		Stopwatch tickTimer = new Stopwatch();
 		public override Job Tick() {
 			if ( !IsValid(GameController.Player) ) {
@@ -773,7 +828,7 @@ namespace Assistant {
 				EquipmentManager.OnTick();
 				FocusManager.OnTick();
 
-				if( Settings.DebugGeneralsCry.Value ) DebugGeneralsCry();
+				if ( Settings.DebugGeneralsCry.Value ) DebugGeneralsCry();
 
 				CheckBanner(Settings.UseDefianceBanner, "DefianceBanner", "armour_evasion_banner_buff_aura", "armour_evasion_banner_stage");
 				CheckBanner(Settings.UseDreadBanner, "PuresteelBanner", "puresteel_banner_buff_aura", "puresteel_banner_stage");
@@ -806,27 +861,27 @@ namespace Assistant {
 			var warriors = actor.DeployedObjects.Select(o => o.Entity).Where(IsValid).Where(o => o.Path.StartsWith("Metadata/Monsters/DoubleCryWarrior")).ToArray();
 			int warriorCount = warriors.Length;
 			bool onCooldown = !(SkillManager.TryGetSkill("GeneralsCry", out ActorSkill skill) && !skill.IsOnCooldown);
-			if( onCooldown && !generalCryWasOnCooldown ) {
+			if ( onCooldown && !generalCryWasOnCooldown ) {
 				generalCryTimer.Restart();
 				generalCryStatus.Clear();
 				// Log($"{generalCryTimer.ElapsedMilliseconds}: General's Cry cast detected by cooldown.");
 			}
 			long delta = warriorCount - deployedCountBefore;
-			if( delta > 0 ) {
+			if ( delta > 0 ) {
 				// Log($"{generalCryTimer.ElapsedMilliseconds}: Gained +{delta} warriors.");
 			} else if ( delta < 0 ) {
 				// Log($"{generalCryTimer.ElapsedMilliseconds}: Lost {delta} warriors.");
 			}
-			if( warriorCount > 0 ) {
-				foreach(var ent in warriors) {
+			if ( warriorCount > 0 ) {
+				foreach ( var ent in warriors ) {
 					var entActor = ent.GetComponent<Actor>();
 					bool attackingNow = entActor.isAttacking;
 					bool movingNow = entActor.isMoving;
 					bool deadNow = !(IsValid(ent) && ent.IsAlive);
-					if( ! generalCryAttackStart.TryGetValue(ent, out long started) ) started = generalCryTimer.ElapsedMilliseconds;
+					if ( !generalCryAttackStart.TryGetValue(ent, out long started) ) started = generalCryTimer.ElapsedMilliseconds;
 					long duration = generalCryTimer.ElapsedMilliseconds - started;
 					GeneralCryStatus newStatus;
-					if( ! generalCryStatus.TryGetValue(ent, out GeneralCryStatus curStatus) ) {
+					if ( !generalCryStatus.TryGetValue(ent, out GeneralCryStatus curStatus) ) {
 						// Log($"{generalCryTimer.ElapsedMilliseconds}: Gained warrior: {ent.Address}");
 						newStatus = GeneralCryStatus.Born;
 					} else {
@@ -840,10 +895,9 @@ namespace Assistant {
 							// entStats.StatDictionary.TryGetValue(GameStat.AccuracyRating, out int accuracy);
 							// Log($"New Warrior Stat (#1 of {entStats.StatsCount}): Accuracy: {accuracy}");
 							// foreach(var statEntry in entStats.StatDictionary) {
-								// Log($"New Warrior Stat: {Enum.GetName(typeof(GameStat), statEntry.Key)} : {statEntry.Value}");
+							// Log($"New Warrior Stat: {Enum.GetName(typeof(GameStat), statEntry.Key)} : {statEntry.Value}");
 							// }
-						}
-						else if ( curStatus == GeneralCryStatus.Attack && newStatus != curStatus ) {
+						} else if ( curStatus == GeneralCryStatus.Attack && newStatus != curStatus ) {
 							PersistedText.Add($"{duration} / {generalCryTimer.ElapsedMilliseconds} ms", ent.Pos, 4000, Color.CornflowerBlue);
 						}
 
@@ -852,7 +906,7 @@ namespace Assistant {
 				}
 
 				string status = "";
-				foreach(var item in generalCryStatus) {
+				foreach ( var item in generalCryStatus ) {
 					status += $"{item.Key.Address % 10000}:{item.Value} ";
 				}
 				Log($"{generalCryTimer.ElapsedMilliseconds}: [ { status }]");
@@ -944,7 +998,7 @@ namespace Assistant {
 				if ( Settings.ShowAttackRate.Value ) {
 					DrawTextAtPlayer($"Attacks: {AttacksPerSecond(61, 10):F2}/s");
 					var dict = GetGame()?.Player.GetComponent<Stats>()?.StatDictionary;
-					if( dict != null ) {
+					if ( dict != null ) {
 						// DrawStatAtPlayer(dict, GameStat.MainHandTotalBaseWeaponAttackDurationMs);
 						// DrawStatAtPlayer(dict, GameStat.MainHandAttackSpeedPct);
 						// DrawStatAtPlayer(dict, GameStat.VirtualActionSpeedPct);
