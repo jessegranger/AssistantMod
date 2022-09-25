@@ -132,7 +132,13 @@ namespace Assistant {
 							// each node in the linked list contains one State
 							State curState = curNode.Value;
 							// that state is ticked once per frame
+							Stopwatch thisTick = Stopwatch.StartNew();
 							State gotoState = curState.OnTick();
+							long elapsed = thisTick.ElapsedMilliseconds;
+							if( elapsed > 100 ) {
+								Log($"OnTick: {curState.Name} took {elapsed} ms, cancelling...");
+								gotoState = null;
+							}
 
 							// the result can either terminate, replace, or continue, the State in this node
 							if ( gotoState == null ) { // terminate the State in this node
@@ -159,8 +165,8 @@ namespace Assistant {
 					watch.Stop();
 					long elapsed = watch.ElapsedMilliseconds;
 					if( elapsed > 30 ) {
-						Log($"StateMachine: {GetType().Name} [{string.Join(", ", States.Select((s) => s.ToString()))}] {watch.Elapsed}");
-						DrawTextAtPlayer($"StateMachine: {GetType().Name} [{string.Join(", ", States.Select((s) => s.ToString()))}] {watch.Elapsed}");
+						// Log($"StateMachine: {GetType().Name} [{string.Join(", ", States.Select((s) => s.ToString()))}] {watch.Elapsed}");
+						// DrawTextAtPlayer($"StateMachine: {GetType().Name} [{string.Join(", ", States.Select((s) => s.ToString()))}] {watch.Elapsed}");
 					}
 				}
 				return States.Count == 0 ? Next : this;
