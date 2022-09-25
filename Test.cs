@@ -21,8 +21,8 @@ namespace Assistant {
 			//  TestFlaskInventory();
 			//  TestPlayerLife();
 			//  TestStash();
-			Equipment();
-			Stats();
+			// Equipment();
+			// Stats();
 			//  TestNearbyBuffs();
 			SkillBar();
 			//  TestDeployedObjects();
@@ -129,25 +129,25 @@ namespace Assistant {
 			var game = GetGame();
 			var panel = game?.IngameState?.IngameUi?.InventoryPanel;
 			if ( panel == null ) {
-				Log("No panel.");
+				Log("Equipment: No panel.");
 				return;
 			}
 			if ( !panel.IsVisible ) {
-				Log("Not visible.");
+				Log("Equipment: Not visible.");
 				return;
 			}
 			var equippedInventories = new InventoryIndex[] {
-						InventoryIndex.Helm,
-						InventoryIndex.Amulet,
-						InventoryIndex.Chest,
-						InventoryIndex.LWeapon,
-						InventoryIndex.RWeapon,
-						InventoryIndex.LWeapon,
-						InventoryIndex.RRing,
-						InventoryIndex.LRing,
-						InventoryIndex.Gloves,
-						InventoryIndex.Belt,
-						InventoryIndex.Boots,
+						//InventoryIndex.Helm,
+						//InventoryIndex.Amulet,
+						//InventoryIndex.Chest,
+						//InventoryIndex.LWeapon,
+						//InventoryIndex.RWeapon,
+						//InventoryIndex.LWeapon,
+						//InventoryIndex.RRing,
+						//InventoryIndex.LRing,
+						//InventoryIndex.Gloves,
+						//InventoryIndex.Belt,
+						//InventoryIndex.Boots,
 						InventoryIndex.PlayerInventory
 					};
 			foreach ( var equipIndex in equippedInventories ) {
@@ -215,8 +215,9 @@ namespace Assistant {
 					string modName = mod.Name;
 					string statName = "";
 					string tags = "";
+					Log($"Mod: Name:{mod.Name} Display:{mod.DisplayName} Group:{mod.Group}");
 					
-					foreach(ModType modType in Enum.GetValues(typeof(ModType)).Cast<ModType>()) {
+					if( (mod.Group?.Length ?? 0) > 0 ) foreach(ModType modType in Enum.GetValues(typeof(ModType)).Cast<ModType>()) {
 						Tuple<string, ModType> modRecordKey = new Tuple<string, ModType>(mod.Group, modType);
 						if( game.Files.Mods.recordsByTier.TryGetValue(modRecordKey, out List<ExileCore.PoEMemory.FilesInMemory.ModsDat.ModRecord> modRecords) ) {
 							var tiers = modRecords
@@ -226,7 +227,7 @@ namespace Assistant {
 								.ToArray();
 							maxLevel = tiers.Length;
 							if( mod.Level > maxLevel ) {
-								Log($"Unknown mod Level: {mod.Level} of {maxLevel} known levels");
+								Log($"Unknown mod {modType} {modName} {mod.Group} Level: {mod.Level} of {maxLevel} known levels");
 								continue;
 							}
 							var modRecord = tiers[mod.Level - 1];
