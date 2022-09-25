@@ -1,4 +1,5 @@
 ﻿using ExileCore;
+using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
@@ -18,6 +19,11 @@ namespace Assistant {
 			string pathName = ent.Path.Substring(ent.Path.LastIndexOf("/") + 1);
 			return pathName.StartsWith("Flask");
 		}
+		// Note: GameUI > 106 > 12 is the XP bar at the bottom
+		// Note: GameUI > 106 > 5 > 1 is the UI root for all the flask elements
+		// GameUI > 106 > 5 > 1 > 0 > 1 is UI element for flask on key 1
+		// GameUI > 106 > 5 > 1 > 0 > 2 is UI element for flask on key 2
+		// GameUI > 106 > 5 > 1 > 0 > 3 is UI element for flask on key 3
 
 		private static Dictionary<string, int> baseHealAmount = new Dictionary<string, int>() {
 			{ "FlaskLife1", 70 },
@@ -158,8 +164,13 @@ namespace Assistant {
 			public bool IsInstantOnLowLife;
 			public bool EnchantUseOnFull;
 			public bool EnchantUseOnHitRare;
+			public bool CuresBleeding;
+			public bool CuresFrozen;
+			public bool CuresShocked;
+			public bool CuresIgnited;
+			public bool CuresPoison;
 			public bool IsFull => CurrentCharges > 0 && CurrentCharges >= MaxCharges;
-			public bool HasEnoughCharge => CurrentCharges >0 && CurrentCharges >= ChargesPerUse;
+			public bool HasEnoughCharge => CurrentCharges > 0 && CurrentCharges >= ChargesPerUse;
 			public bool IsUsable(int cooldown) => HasEnoughCharge && GlobalTimer.ElapsedMilliseconds > 200 && ((!UseTimer.IsRunning) || UseTimer.ElapsedMilliseconds > cooldown);
 			public Flask() {
 			}
@@ -197,10 +208,7 @@ namespace Assistant {
 			OnRelease(Keys.Pause, RefreshFlaskMods);
 			// bind HOME to just refresh flasks again (maybe the user moves them around)
 			OnRelease(Keys.Home, RefreshFlaskMods);
-			PersistedText.Add(GetStatusText, (c) => ScreenRelativeToWindow(.305f, .983f), 0, Color.Orange);
 		}
-
-		private static string GetStatusText() => $"[{(IsPaused() ? "=" : ">")}]";
 
 		private static Dictionary<string, Flask> conditionMap = new Dictionary<string, Flask>();
 		private static bool TryGetFlaskForCondition(string condition, out Flask flask) => conditionMap.TryGetValue(condition, out flask);
@@ -276,6 +284,7 @@ namespace Assistant {
 							LinkConditionToFlask("bleeding", flask);
 							LinkConditionToFlask("corrupted_blood", flask);
 							LinkConditionToFlask("corrupting_blood", flask);
+							flask.CuresBleeding = true;
 							break;
 						case "FlaskEffectNotRemovedOnFullMana":
 							flask.ManaHealAmount = (int)((float)flask.ManaHealAmount * .70f);
@@ -283,23 +292,30 @@ namespace Assistant {
 							break;
 						case "FlaskRemovesShock":
 						case "FlaskShockImmunity":
-							LinkConditionToFlask("shocked", flask); break;
+							LinkConditionToFlask("shocked", flask);
+							flask.CuresShocked = true;
+							break;
 						case "FlaskCurseImmunity":
-							LinkConditionToFlask("cursed", flask); break;
+							LinkConditionToFlask("cursed", flask);
+							break;
 						case "FlaskDispellsChill":
 						case "FlaskChillFreezeImmunity":
 						case "FlaskFreezeAndChillImmunityDuringEffect":
 							LinkConditionToFlask("chilled", flask);
-							LinkConditionToFlask("frozen", flask); break;
+							LinkConditionToFlask("frozen", flask);
+							flask.CuresFrozen = true;
+							break;
 						case "FlaskIgniteImmunityDuringEffect":
 						case "FlaskIgniteImmunity":
 						case "FlaskDispellsBurning":
 							LinkConditionToFlask("burning", flask);
 							LinkConditionToFlask("ignited", flask);
+							flask.CuresIgnited = true;
 							break;
 						case "FlaskDispellsPoison":
 						case "FlaskPoisonImmunity":
 							LinkConditionToFlask("poisoned", flask);
+							flask.CuresPoison = true;
 							break;
 					}
 				}
@@ -346,13 +362,7 @@ namespace Assistant {
 		}
 
 		public static void Render() {
-			var gfx = GetGraphics();
-			for ( int i = 0; i < 5; i++ ) {
-				Flask f = GetFlask(i);
-				var pos = ScreenRelativeToWindow(.178f + (.028f * i), .898f);
-				gfx.DrawText($"{(f.LifeHealAmount > 0 ? f.LifeHealAmount : f.ManaHealAmount)}", pos, (f.LifeHealAmount > 0 ? Color.Red : f.ManaHealAmount > 0 ? Color.Teal: Color.Yellow));
-				// gfx.DrawText($"[{f.CurrentCharges}/{f.ChargesPerUse}]", pos, f.HasEnoughCharge ? SharpDX.Color.Yellow : SharpDX.Color.Orange);
-			}
+
 		}
 
 		private static void CheckFlasks() {
@@ -396,7 +406,7 @@ namespace Assistant {
 		}
 		private static bool NeedLifeFlask(Life life) {
 			var maxHp = life.MaxHP - life.TotalReservedHP;
-			if( HasBuff("petrified_blood") ) {
+			if ( HasBuff("petrified_blood") ) {
 				maxHp = Math.Min(maxHp, life.MaxHP / 2);
 			}
 			return life.CurHP <= maxHp / 2;
@@ -406,7 +416,7 @@ namespace Assistant {
 			var manaThreshold = maxMana * .4f;
 			var curMana = life.CurMana;
 			var settings = GetSettings();
-			if( settings?.DebugLife ?? false ) {
+			if ( settings?.DebugLife ?? false ) {
 				DrawTextAtPlayer($"Mana: {curMana} Threshold: {manaThreshold} Active: {HasAnyBuff("flask_effect_mana")}");
 			}
 			return curMana < manaThreshold && !HasAnyBuff("flask_effect_mana");
@@ -429,22 +439,27 @@ namespace Assistant {
 					} else {
 						slowFlask = slowFlask ?? flask;
 					}
-				} else if( settings.UseManaFlasks && needManaFlask && (!hasActiveManaFlask) && flask.ManaHealAmount > 0 && flask.IsUsable(200) ) {
-					return flask.UseFlask(200);
-				} else if( settings.AutoUseFullPotions 
+				} else if ( settings.UseManaFlasks
+					&& needManaFlask
+					&& (!hasActiveManaFlask)
+					&& flask.ManaHealAmount > 0
+					&& flask.IsUsable(200)
+					&& flask.UseFlask(200) ) {
+					return true;
+				} else if ( settings.AutoUseFullPotions
 					&& flask.IsFull
 					&& flask.LifeHealAmount == 0 && flask.ManaHealAmount == 0
-					&& !flask.IsActive()
-					&& flask.UseFlask(2000 + r.Next(1,100))) {
+					&& (!flask.IsActive())
+					&& flask.UseFlask(2000 + r.Next(1, 100)) ) {
 					return true;
-				} else if( settings.MaintainFlasksOnRare
+				} else if ( settings.MaintainFlasksOnRare
 					&& hasHitNearbyRare
 					&& flask.LifeHealAmount == 0
 					&& flask.ManaHealAmount == 0
 					&& (!flask.EnchantUseOnHitRare)
 					&& flask.HasEnoughCharge
 					&& (!flask.IsActive())
-					&& flask.UseFlask(2000 + r.Next(1,100)) ) {
+					&& flask.UseFlask(2000 + r.Next(50, 120)) ) {
 					return true;
 				}
 			}
