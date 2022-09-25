@@ -25,10 +25,36 @@ namespace Assistant {
 			Game = game;
 			Gfx = gfx;
 			Settings = settings;
-			IsInitialised = true;
-			Run(TrackMovement);
-			OnRelease(Keys.Pause, TogglePause);
+			if( PowerOnSelfTest(game) ) {
+				Run(TrackMovement);
+				OnRelease(Keys.Pause, TogglePause);
+				Game.Area.OnAreaChange += Area_OnAreaChange;
+				timeInZone.Start();
+				IsInitialised = true;
+			} else {
+				Settings.Enable.Value = false;
+			}
 			// Machine.EnableLogging((s) => Log(s));
+		}
+
+		private static int postCount = 0;
+		private static bool PowerOnSelfTest(bool cond, string text) {
+			Log($"POST{++postCount}");
+			if( ! cond ) Log("FAIL: " + text);
+			return cond;
+		}
+		private static bool PowerOnSelfTest(GameController game) {
+			return
+				PowerOnSelfTest(game.Area != null, "Area is null") &&
+				// PowerOnSelfTest((game.EntityListWrapper?.EntityCache?.Count ?? 0) > 0, "Has no entities") &&
+				PowerOnSelfTest((game.IngameState != null), "Has no IngameState") &&
+				PowerOnSelfTest((game.IngameState.IngameUi != null), "Has no IngameState.IngameUi") &&
+				PowerOnSelfTest((game.IngameState.IngameUi.Map != null), "Has no ui.Map") &&
+				PowerOnSelfTest((game.IngameState.IngameUi.Map.SmallMiniMap != null), "Has no ui.Map.SmallMiniMap") &&
+				PowerOnSelfTest((game.IngameState.IngameUi.Map.LargeMap != null), "Has no ui.Map.LargeMap") &&
+				PowerOnSelfTest(game.IngameState?.IngameUi?.InventoryPanel != null, "Has no inventoryPanel") &&
+				PowerOnSelfTest(game.IngameState?.IngameUi?.StashElement != null, "Has no stashElement")
+			;
 		}
 
 		public const string PATH_STACKEDDECK = "Metadata/Items/DivinationCards/DivinationCardDeck";
@@ -60,9 +86,25 @@ namespace Assistant {
 
 		public static Entity GetPlayer() => Game?.Player;
 
+		public static RectangleF GetWindow() => Game?.Window?.GetWindowRectangleTimeCache ?? RectangleF.Empty;
+		public static float GetLineHeight() => 18f; // TODO: read the font setting from Core
+
+		private static int bottomRightLineCount = 0;
+		private static float bottomTextPadding = 4f;
+		public static void DrawBottomRightText(string line) => DrawBottomRightText(line, Color.White);
+		public static void DrawBottomRightText(string line, Color color) {
+			var rect = GetWindow();
+			bottomRightLineCount += 1;
+			var pos = rect.BottomRight;
+			pos.Y -= bottomTextPadding + (GetLineHeight() * bottomRightLineCount);
+			Gfx.DrawText(line, pos, color, FontAlign.Right);
+		}
 		public static void Render() {
 			if ( !IsInitialised ) return;
 			lineCounts.Clear();
+			bottomRightLineCount = 0;
+			string zoneTime = timeInZone.Elapsed.ToString(@"mm\:ss");
+			DrawBottomRightText($"[{(isPaused ? "=" : ">")}] ({zoneTime})", Color.Orange);
 		}
 		public static void Tick(long dt) {
 			if ( !IsInitialised ) return;
@@ -72,6 +114,7 @@ namespace Assistant {
 		}
 		public static void Run(State s) => Machine.Add(s);
 		public static void Run(Func<State, State> s) => Machine.Add(State.From(s));
+		public static void Run(string label, Func<State, State> s) => Machine.Add(State.From(label, s));
 		public static void Cancel(State s) => Machine.Remove(s);
 
 		private static bool isPaused = true;
@@ -602,6 +645,12 @@ namespace Assistant {
 			if ( !IsValid(item) ) return false;
 			var stack = item.Item.GetComponent<Stack>();
 			return stack.Size >= stack.Info.MaxStackSize;
+		}
+
+		private static Stopwatch timeInZone = new Stopwatch();
+		private static void Area_OnAreaChange(AreaInstance obj) {
+			Log(string.Format("Leaving Zone after {0}", timeInZone.Elapsed.ToString(@"mm\:ss")));
+			timeInZone.Restart();
 		}
 
 	}
