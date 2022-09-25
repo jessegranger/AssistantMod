@@ -7,19 +7,11 @@ using static Assistant.Globals;
 
 namespace Assistant {
 	static class BuffManager {
-		private static GameController api;
-		private static Graphics Graphics;
-		private static AssistantSettings Settings;
 		private static bool Paused = true;
-		internal static void Initialise(GameController game, Graphics gfx, AssistantSettings settings) {
-			api = game;
-			Graphics = gfx;
-			Settings = settings;
+		internal static void Initialise() {
 			OnRelease(Keys.Pause, () => Paused = !Paused);
 			// PersistedText.Add(GetStatusText, (c) => ScreenRelativeToWindow(.72f, .85f), 0);
 		}
-
-		private static string GetStatusText() => $"BuffManager[{(Paused ? "Paused" : "Running")}]";
 
 		private static List<BuffToMaintain> vaalBuffsToMaintain = new List<BuffToMaintain>();
 		private static List<BuffToMaintain> buffsToMaintain = new List<BuffToMaintain>();
