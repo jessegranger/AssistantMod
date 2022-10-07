@@ -1,4 +1,5 @@
-﻿using ExileCore.Shared.Cache;
+﻿using ExileCore;
+using ExileCore.Shared.Cache;
 using ExileCore.Shared.Nodes;
 using System;
 using System.Collections.Generic;
@@ -55,7 +56,12 @@ namespace Assistant {
 					curStep += 1;
 					sinceLastRelease.Restart();
 					if ( curStep >= keys.Length ) {
-						action();
+						try {
+							action();
+						} catch( Exception e ) {
+							DebugWindow.LogError(e.ToString());
+							return null; // cancel the failing state
+						}
 						return doReset(downNow, state);
 					}
 				} else if ( sinceLastRelease.ElapsedMilliseconds > 1000 ) {
