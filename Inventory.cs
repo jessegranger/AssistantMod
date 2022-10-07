@@ -2,6 +2,7 @@
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.Elements.InventoryElements;
 using ExileCore.PoEMemory.MemoryObjects;
+using ExileCore.Shared;
 using ExileCore.Shared.Enums;
 using SharpDX;
 using System;
@@ -48,9 +49,15 @@ namespace Assistant {
 		public static void MarkExpected(int x, int y, int w, int h) {
 			MarkOccupied(inventoryMap, new ExpectedItem(x, y, w, h));
 		}
-		public static void MarkExpected(Vector2 relPos, int w, int h) {
-			var pos = ScreenRelativeToBackpackSlot(relPos);
-			MarkExpected((int)pos.X, (int)pos.Y, w, h);
+		public static void MarkExpected(Vector2 absPos, int w, int h) {
+			var slot = ScreenAbsoluteToBackpackSlot(absPos);
+			MarkExpected((int)slot.X, (int)slot.Y, w, h);
+		}
+		internal static State RefreshBackpack(State next) {
+			return State.From("RefreshBackpack", (self) => {
+				RefreshBackpack();
+				return next;
+			});
 		}
 		internal static void RefreshBackpack() {
 			var game = GetGame();
@@ -67,7 +74,7 @@ namespace Assistant {
 			inventoryMap = map;
 
 			// debug output:
-			for ( uint dy = 0; dy < 5; dy++ ) {
+			if ( false ) for ( uint dy = 0; dy < 5; dy++ ) {
 				string line = "";
 				for ( uint dx = 0; dx < 12; dx++ ) {
 					if ( inventoryMap[dx, dy] != null ) line += "x";
@@ -155,8 +162,9 @@ namespace Assistant {
 		internal static State PlanUseItem(NormalInventoryItem item, State next, State fail) => IsValid(item) ? new RightClickAt(item, inputSpeed, next) : fail;
 
 		internal static State PlanUseItem(string path, State next = null) {
-			return PlanUseItem(FindFirstItem(path), next, State.From((s) => {
-				Log($"UseItem: Cannot find any {path} to use.");
+			if ( IsPaused() ) return null;
+			return PlanUseItem(FindFirstItem(path), next, State.From("PlanUseItemFailed", (s) => {
+				Notify($"UseItem: Cannot find any {path} to use.", Color.Yellow);
 				return null;
 			}));
 		}
@@ -164,15 +172,18 @@ namespace Assistant {
 		public static NormalInventoryItem FindFirstStashItem(string path) => StashItems().Where(IsValid).Where((i) => i.Item.Path.Equals(path)).FirstOrDefault();
 
 		internal static State PlanUseStashItem(string path, State next = null) {
+			if ( IsPaused() ) return null;
 			if ( !StashIsOpen() ) return null;
 			var useItem = FindFirstStashItem(path);
 			if( IsValid(useItem) ) {
 				return new RightClickAt(useItem, inputSpeed, next);
 			}
 			Log($"UseStashItem: Cannot find any {path} to use.");
+			Notify($"UseStashItem: Cannot find any {path} to use.", Color.Yellow);
 			return null;
 		}
 		internal static State PlanUseStashItemOnItem(string path, NormalInventoryItem item, uint clicks = 1, State next = null) {
+			if ( IsPaused() ) return null;
 			var pos = item.GetClientRect().Center;
 			return PlanUseStashItem(path, 
 				new KeyDown(Keys.LShiftKey, new Delay(50,
@@ -188,91 +199,149 @@ namespace Assistant {
 			}
 			return false;
 		}
+		
+		private static State PlanIdentifyAll(State next = null) {
+			if ( IsPaused() ) return null;
+			if ( !BackpackIsOpen() ) return null;
+			uint unidentifiedCount = 0;
+			// pick up a scroll of wisdom
+			State start = State.From(() => { }); // use an empty node so it's easy to sub in Notify if we want one
+			State step = start.Then(PlanUseItem(PATH_SCROLL_WISDOM, null));
+			// hold shift
+			step = step.Then(new KeyDown(Keys.LShiftKey, null));
+			State stop = new KeyUp(Keys.LShiftKey, next);
+			// left-click on all unidentified items
+			foreach ( var item in BackpackItems() ) {
+				var mods = item.Item.GetComponent<Mods>();
+				bool identified = mods?.Identified ?? true;
+				if ( identified ) continue;
+				if ( item.Item.Path.StartsWith(PATH_MAP_PREFIX) && !GetSettings().IdentifyMaps ) {
+					continue;
+				}
+				unidentifiedCount += 1;
+				step = step.Then(OnlyIfBackbackIsOpen(pass: new LeftClickAt(item, inputSpeed, 1, null), fail: stop));
+			}
+			// lift shift
+			step.Then(stop);
+			step = start;
+			while( step != null ) {
+				Log($"{step.Name} =>");
+				step = step.Next;
+			}
+			if ( unidentifiedCount == 0 ) return next;
+			return start;
+		}
 
-		internal static State PlanStashAll(State next = null) {
+		private static State OnlyIfBackbackIsOpen(State pass, State fail = null) {
+			return State.From("OnlyIfBackpackIsOpen", (self) => {
+				return BackpackIsOpen() && !IsPaused() ? pass : fail;
+			}, pass);
+		}
+
+		private static State PlanIncubateAll(State next = null) {
+			if ( !BackpackIsOpen() ) return null;
+			if ( !GetSettings().ApplyIncubators ) return next;
+			// find out all the equipped items we can incubate
+			var incubatable = new Stack<NormalInventoryItem>(EquippedItems().Where(item => IsValid(item) && item.Item.GetComponent<Mods>().IncubatorName == null));
+			Log($"IncubateAll: Incubatable Equipment: {string.Join(" ", incubatable.Select(i => i.Item.Path.Split('/').Last()))}");
+			if ( incubatable.Count == 0 ) return next;
+			State start = State.From(() => {}, null);
+			State step = start;
+			foreach ( var item in BackpackItems() ) {
+				if ( item.Item.Path.StartsWith(PATH_INCUBATOR_PREFIX) ) {
+					int count = item.Item.GetComponent<Stack>()?.Size ?? 0;
+					while( count > 0 && incubatable.Count > 0 ) {
+						step = step.Then(OnlyIfBackbackIsOpen(
+							Notify($"Incubating item {item.Item.Path.Split('/').Last()} into {incubatable.Peek()?.Item.Path.Split('/').Last()}...", Color.Yellow, 3000, 1f,
+							new RightClickAt(item, inputSpeed,
+							new LeftClickAt(incubatable.Pop(), inputSpeed, 1))),
+						fail: null)); ;
+						count -= 1;
+					}
+				}
+			}
+			step.Then(new Delay(300, RefreshBackpack(next)));
+			return start;
+		}
+
+		private static State PlanStashAll(State next = null) {
+			if ( IsPaused() ) return null;
+			if ( !BackpackIsOpen() ) return null;
+			uint stashableItems = 0;
 			var settings = GetSettings();
-			var doNotStashSet = new HashSet<NormalInventoryItem>();
-			var doNotIdentifySet = new HashSet<NormalInventoryItem>();
-			var doNotIncubateSet = new HashSet<NormalInventoryItem>();
-			var doNotOpenSet = new HashSet<NormalInventoryItem>();
-			return State.From("StashAll", (state) => {
-				var needs = new Dictionary<string, int>(restockNeeds);
-				if ( !StashIsOpen() ) {
-					Log("Stash not open.");
-					return null;
+			// make a copy of the "needs" data, then subtract out items as they are skipped
+			var needs = new Dictionary<string, int>(restockNeeds);
+			// hold control
+			State start = new KeyDown(Keys.LControlKey, null);
+			State step = start;
+			State stop = new KeyUp(Keys.LControlKey, next);
+			// left click everything in the inventory (once)
+			foreach(var item in BackpackItems()) {
+				var ent = item.Item;
+				// skip items in restockNeeds
+				if ( needs.TryGetValue(ent.Path, out int need) && need > 0 ) {
+					// deduct the skipped items from the amount we need
+					needs[ent.Path] -= ent.GetComponent<Stack>()?.Size ?? 1;
+					continue;
 				}
-				if ( !BackpackIsOpen() ) {
-					Log("Backpack is not open.");
-					return null;
-				}
-				RefreshBackpack();
-				foreach ( var item in BackpackItems() ) {
-					if ( doNotStashSet.Contains(item) ) { continue; }
-					if ( !IsValid(item) ) { continue; }
-					var ent = item.Item;
-					var mods = ent.GetComponent<Mods>();
-					if ( !doNotIdentifySet.Contains(item) && (!(mods?.Identified ?? true)) ) {
-						doNotIdentifySet.Add(item); // never try to identify it twice
-						if ( ent.Path.StartsWith(PATH_MAP_PREFIX) && ! settings.IdentifyMaps ) {
-							continue;
-						}
-						return PlanUseItemOnItem(PATH_SCROLL_WISDOM, item, 1, state);
-					}
-					if ( needs.TryGetValue(ent.Path, out int need) && need > 0 ) {
-						needs[ent.Path] -= ent.GetComponent<Stack>()?.Size ?? 1;
-						continue;
-					}
-					if ( ent.Path.Equals(PATH_STACKEDDECK) && settings.OpenStashedDecks ) continue; // a second pass will open these
-					if ( ent.Path.StartsWith(PATH_INCUBATOR_PREFIX) && !doNotIncubateSet.Contains(item) ) {
-						doNotIncubateSet.Add(item);
-						return PlanApplyIncubator(item, state);
-					}
-					var pos = item.GetClientRect().Center;
-					if ( !IsValid(pos) ) { continue; }
-					Log($"Stashing {ent.Path} with a ctrl-left-click at: {pos}");
-					doNotStashSet.Add(item); // never try to stash it twice
-					return new CtrlLeftClickAt(pos.X, pos.Y, inputSpeed, state);
-				}
-				Func<NormalInventoryItem, State, State> open = (item, nextDeck) => {
-					var deckPosition = item.GetClientRect().Center;
-					var stackSize = item.Item.GetComponent<Stack>().Size;
-					return State.From((nextCard) => {
-						if ( !BackpackIsOpen() ) return null;
-						if( stackSize > 0 ) {
-							Vector2 pos2 = GetFreeSlot(1, 1);
-							if ( pos2 == Vector2.Zero ) {
-								Log("No more open space found.");
-								return null;
-							}
-							stackSize -= 1;
-							MarkExpected(pos2, 1, 1);
-							pos2 = ScreenRelativeToWindow(pos2);
-							return new RightClickAt(deckPosition, inputSpeed,
-								new LeftClickAt(pos2, inputSpeed, 1,
-									new Delay(inputSpeed, nextCard)));
-						}
-						return nextDeck;
-					});
-				};
-				return State.From((nextDeck) => {
-					if ( !BackpackIsOpen() ) return null;
-					RefreshBackpack();
-					foreach ( var item in BackpackItems() ) {
-						if ( !IsValid(item) ) { continue; }
-						var ent = item.Item;
-						if ( ent.Path.Equals(PATH_STACKEDDECK) ) {
-							return open(item, new Delay(400, nextDeck));
-						}
-					}
-					return null;
-				});
+				// and skip stacked decks
+				if ( ent.Path.Equals(PATH_STACKEDDECK) && settings.OpenStashedDecks ) continue; // a second pass will open these
+				stashableItems += 1;
+				step = step.Then(OnlyIfBackbackIsOpen(new LeftClickAt(item, inputSpeed, 1, null), fail: stop));
+			}
+			if ( stashableItems == 0 ) return next;
+			// lift control
+			step.Then(stop);
+			return start;
+		}
 
+		private static State PlanOpenDeck(NormalInventoryItem item, State nextDeck) {
+			var deckPosition = item.GetClientRect().Center;
+			var stackSize = item.Item.GetComponent<Stack>().Size;
+			return State.From((nextCard) => {
+				if ( IsPaused() ) return null;
+				if ( !BackpackIsOpen() ) return null;
+				if ( stackSize > 0 ) {
+					Vector2 pos2 = GetFreeSlot(1, 1);
+					if ( pos2 == Vector2.Zero ) {
+						Log("No more open space found.");
+						return null;
+					}
+					stackSize -= 1;
+					MarkExpected(pos2, 1, 1);
+					// pos2 = ScreenRelativeToWindow(pos2);
+					return OnlyIfBackbackIsOpen(new RightClickAt(deckPosition, inputSpeed,
+						new LeftClickAt(pos2, inputSpeed, 1,
+							new Delay(inputSpeed, nextCard))));
+				}
+				return nextDeck;
 			});
 		}
+
+		private static State PlanOpenAllDecks(State next = null) {
+			if ( IsPaused() ) return null;
+			if ( !BackpackIsOpen() ) return null;
+			if ( !GetSettings().OpenStashedDecks ) return next;
+			return State.From((nextDeck) => {
+				foreach ( var item in BackpackItems() ) {
+					if ( !IsValid(item) ) { continue; }
+					var ent = item.Item;
+					if ( ent.Path.Equals(PATH_STACKEDDECK) ) {
+						return PlanOpenDeck(item, new Delay(400, nextDeck));
+					}
+				}
+				return next;
+			});
+		}
+
 		internal static void StashDeposit(State next = null) {
 			Run(PlanTeleportHome(
 				PlanOpenStash(
-					PlanStashAll(next))));
+					PlanIdentifyAll(
+						PlanIncubateAll(
+							PlanStashAll(
+								RefreshBackpack(
+									PlanOpenAllDecks(next))))))));
 		}
 
 		private static Dictionary<string, int> restockNeeds = new Dictionary<string, int>() {
@@ -426,7 +495,7 @@ namespace Assistant {
 						} else {
 							var slot = GetFreeSlot(1, 1);
 							if ( IsValid(slot) ) {
-								targetPos = ScreenRelativeToWindow(slot);
+								targetPos = slot;
 							}
 						}
 						if ( !IsValid(targetPos) ) continue;
@@ -464,14 +533,22 @@ namespace Assistant {
 			return false;
 		}
 
-		private static Vector2 TopLeftRelativePosition = new Vector2(.625f, .545f);
-		private static Vector2 TileRelativeSize = new Vector2(.03f, .049f);
-		private static Vector2 TileRelativeCenter(uint tx, uint ty) => new Vector2(TopLeftRelativePosition.X + ((tx + .5f) * TileRelativeSize.X), TopLeftRelativePosition.Y + ((ty + .5f) * TileRelativeSize.Y));
-		public static Vector2 ScreenRelativeToBackpackSlot(Vector2 relPos) {
-			relPos = (relPos - TopLeftRelativePosition) / TileRelativeSize;
-			relPos.X = (int)relPos.X;
-			relPos.Y = (int)relPos.Y;
-			return relPos;
+		public static Vector2 ScreenAbsoluteToBackpackSlot(Vector2 absPos) {
+			var elem = GetGame().IngameState.IngameUi.InventoryPanel[InventoryIndex.PlayerInventory].InventoryUIElement;
+			RectangleF rect = elem.GetClientRectCache; // applies zoom/scale from UI settings
+			Vector2 topLeft = rect.TopLeft;
+			float tileWidth = rect.Width / 12f;
+			float tileHeight = rect.Height / 5f;
+			var innerDelta = absPos - topLeft;
+			return new Vector2(innerDelta.X / tileWidth, innerDelta.Y / tileHeight);
+		}
+		internal static Vector2 GetSlotPositionAbsolute(uint x, uint y) {
+			var elem = GetGame().IngameState.IngameUi.InventoryPanel[InventoryIndex.PlayerInventory].InventoryUIElement;
+			RectangleF rect = elem.GetClientRectCache; // applies zoom/scale from UI settings
+			Vector2 topLeft = rect.TopLeft;
+			float tileWidth = rect.Width / 12f;
+			float tileHeight = rect.Height / 5f;
+			return topLeft + new Vector2(tileWidth * (x + 0.5f), tileHeight * (y + 0.5f));
 		}
 		internal static Vector2 GetFreeSlot(uint w, uint h) {
 			Log($"GetFreeSlot({w},{h})");
@@ -479,7 +556,7 @@ namespace Assistant {
 				for ( uint dx = 0; dx < 12; dx++ ) {
 					if ( !IsOccupied(dx, dy, w, h) ) {
 						Log($"Found free slot {dx}, {dy}");
-						return TileRelativeCenter(dx, dy);
+						return GetSlotPositionAbsolute(dx, dy);
 					}
 				}
 			}
@@ -490,11 +567,11 @@ namespace Assistant {
 			RefreshBackpack();
 			var pos = GetFreeSlot(w, h);
 			if ( pos == Vector2.Zero ) PersistedText.Add("[No Free Slots]", ScreenRelativeToWindow(.5f, .5f), 4000, Color.White);
-			else PersistedText.Add("[Free]", ScreenRelativeToWindow(pos.X, pos.Y), 4000, Color.White);
+			else PersistedText.Add("[Free]", pos, 4000, Color.White);
 		}
 
 		internal static NormalInventoryItem GetItemUnderCursor() {
-			Vector2 pos = ScreenRelativeToBackpackSlot(WindowToScreenRelative(Input.MousePosition));
+			Vector2 pos = ScreenAbsoluteToBackpackSlot(Input.MousePosition);
 			Log($"Cursor is over inventory slot: {pos}");
 			return inventoryMap[(int)pos.X, (int)pos.Y];
 		}
@@ -508,7 +585,6 @@ namespace Assistant {
 						InventoryIndex.Chest,
 						InventoryIndex.LWeapon,
 						InventoryIndex.RWeapon,
-						InventoryIndex.LWeapon,
 						InventoryIndex.RRing,
 						InventoryIndex.LRing,
 						InventoryIndex.Gloves,
@@ -526,7 +602,7 @@ namespace Assistant {
 					Log($"Warn: Equipment Inventory {equipIndex} has null items");
 					continue;
 				}
-				Log($"Inventory {equipIndex}: {equipInventory.IsValid} {equipItems.Count}");
+				// Log($"Inventory {equipIndex}: {equipInventory.IsValid} {equipItems.Count}");
 				var equipItem = equipItems.FirstOrDefault();
 				if ( equipItem == null ) {
 					Log($"Warn: Equipment Inventory {equipIndex} has null first item");
