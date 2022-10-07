@@ -58,9 +58,9 @@ namespace Assistant {
 		public virtual string Describe() => $"{Name}{(Next == null ? " end" : " then " + Next.Describe())}";
 
 		// You can create a new State using any Func<State, State>
-		public static State From(string label, Func<State, State> func) => new Runner(label, func);
+		public static State From(string label, Func<State, State> func, State next = null) => new Runner(label, func, next);
 		public static State From(Func<State, State> func) => new Runner(func);
-		public static State From(Action func) => new ActionState(func);
+		public static State From(Action func, State next = null) => new ActionState(func, next);
 		// public static implicit operator State(Func<State, State> func) => new Runner(func);
 		// public static implicit operator Func<State, State>(State state) => (s) => { try { return state.OnTick(); } catch ( Exception ) { return null; } };
 
@@ -72,6 +72,9 @@ namespace Assistant {
 			public override string Name => name;
 			private readonly string name = "...";
 			public Runner(string name, Func<State, State> func) : this(func) => this.name = name;
+			// allowing to construct with .Next is only slightly useful, the real .Next is the return value of func()
+			// but sometimes it's helpful when building chains to have .Next attached to this Runner state
+			public Runner(string name, Func<State, State> func, State next) : this(name, func) => this.Next = next;
 		}
 
 		public class Machine : State {
@@ -111,16 +114,22 @@ namespace Assistant {
 			public void DisableLogging() => logDelegate = null;
 			private void Log(string s) => logDelegate?.Invoke($"{machineTimer.Elapsed} {s}");
 
-			private static Stopwatch machineTimer = new Stopwatch();
-			static Machine() => machineTimer.Start();
+			private static Stopwatch machineTimer = Stopwatch.StartNew();
 
 			public void Pause() => Paused = true;
 			public void Resume() => Paused = false;
 			public void TogglePause() => Paused = !Paused;
 			private bool Paused = false;
 
+			private static int lastActionTime = 0;
+
 			public override State OnTick() {
 				if ( Paused ) return this;
+				if( lastActionTime == Assistant.RenderFrameCount) {
+					// if the main plugins Render frame is not advancing, dont advance any of the states in the machine
+					return this;
+				}
+				lastActionTime = Assistant.RenderFrameCount;
 				// Each State in the States list will be ticked "in parallel" (all get ticked each frame)
 				Stopwatch watch = new Stopwatch();
 				watch.Start();
@@ -133,9 +142,10 @@ namespace Assistant {
 							State curState = curNode.Value;
 							// that state is ticked once per frame
 							Stopwatch thisTick = Stopwatch.StartNew();
+							lastActionTime = WaitRender.FrameCount;
 							State gotoState = curState.OnTick();
 							long elapsed = thisTick.ElapsedMilliseconds;
-							if( elapsed > 100 ) {
+							if( false && elapsed > 100 ) {
 								Log($"OnTick: {curState.Name} took {elapsed} ms, cancelling...");
 								gotoState = null;
 							}
