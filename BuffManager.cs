@@ -71,6 +71,7 @@ namespace Assistant {
 		};
 		public static Dictionary<string, string> TextureReverseMapping = new Dictionary<string, string>();
 
+		/* Disabled for now: needs more updates to Core Element
 		public static bool TryGetKeyBinding(string skillName, out string keyBind) {
 			keyBind = null;
 			if( TextureMapping.TryGetValue(skillName, out string searchTexture) ) {
@@ -141,6 +142,7 @@ namespace Assistant {
 		public static void ChangeKeyBindToSkill(string keyBind, string skillName) {
 
 		}
+		*/
 
 		public static void OnTick() {
 			if ( Paused ) return;

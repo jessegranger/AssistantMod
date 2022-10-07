@@ -199,6 +199,7 @@ namespace Assistant {
 				// DebugWindow.LogDebug($"{path}");
 				// }
 				SkillBarElement child = GetUI().SkillBar;
+				/*
 				for(int i = 0; i < child.ChildCount; i++ ) {
 					var slot = child.GetSkillSlot(i);
 					Log($"My address {child.Children[i]?.Address} should == {slot?.Address}");
@@ -207,6 +208,8 @@ namespace Assistant {
 						DrawTopLeftText($"Skill: {i} Name:{slot.TooltipName} Key:{slot.KeyBind} Texture:{slot.Texture}", Color.White, 30000);
 					}
 				}
+				*/
+
 				/*
 				for ( int i = 0x3D0; i <= 0x4B0; i += sizeof(long) ) {
 					string lineFront = $"{i:X2}:";
@@ -708,6 +711,7 @@ namespace Assistant {
 			return true;
 		}
 
+		/*
 		public void DrawAllFrames(Element node, Color color, int thickness, uint duration) => DrawAllFrames(node, color, thickness, duration, Vector2.Zero);
 		public void DrawAllFrames(Element node, Color color, int thickness, uint duration, Vector2 textOffset) {
 			Element child = GetUI().SkillBar;
@@ -729,6 +733,7 @@ namespace Assistant {
 				}
 			}
 		}
+		*/
 
 		public IEnumerable<string> FindAllTooltips(Element node, string path, HashSet<Element> seen) {
 			if ( seen == null ) seen = new HashSet<Element>();
