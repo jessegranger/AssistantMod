@@ -14,16 +14,7 @@ using static Assistant.Globals;
 namespace Assistant {
 	static class FlaskManager {
 
-		public static bool IsFlask(Entity ent) {
-			if ( !IsValid(ent) ) return false;
-			string pathName = ent.Path.Substring(ent.Path.LastIndexOf("/") + 1);
-			return pathName.StartsWith("Flask");
-		}
-		// Note: GameUI > 106 > 12 is the XP bar at the bottom
-		// Note: GameUI > 106 > 5 > 1 is the UI root for all the flask elements
-		// GameUI > 106 > 5 > 1 > 0 > 1 is UI element for flask on key 1
-		// GameUI > 106 > 5 > 1 > 0 > 2 is UI element for flask on key 2
-		// GameUI > 106 > 5 > 1 > 0 > 3 is UI element for flask on key 3
+		public static bool IsFlask(Entity ent) => IsValid(ent) && ent.Path.Substring(ent.Path.LastIndexOf("/") + 1).StartsWith("Flask");
 
 		private static Dictionary<string, int> baseHealAmount = new Dictionary<string, int>() {
 			{ "FlaskLife1", 70 },
