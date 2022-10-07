@@ -21,11 +21,26 @@ namespace Assistant {
 			game.Area.OnAreaChange += OnAreaChange;
 		}
 
+		private long xpAtLastAreaChange = 0;
+		private long normalKillsInArea = 0;
+		private long magicKillsInArea = 0;
+		private long rareKillsInArea = 0;
+		private long uniqueKillsInArea = 0;
 		private void OnAreaChange(ExileCore.AreaInstance obj) {
 			while ( incomingMonsters.TryDequeue(out Sighting ignored) ) { }
 			while ( outgoingMonsters.TryDequeue(out uint ignored) ) { }
 			while ( dyingMonsters.TryDequeue(out Vector3 ignored) ) { }
 			seenMonsters.Clear();
+			long xpCurrent = GetGame()?.Player.GetComponent<Player>().XP ?? xpAtLastAreaChange;
+			long xpDelta = xpCurrent - xpAtLastAreaChange;
+			if ( xpAtLastAreaChange != 0 && xpDelta != 0 && GetSettings().ShowXPReport ) {
+				Notify($"Kills: {uniqueKillsInArea} uniq, {rareKillsInArea} rare, {magicKillsInArea} magic, {normalKillsInArea} white, {formatNumber(xpCurrent - xpAtLastAreaChange)} xp", Color.Yellow, 10000, 1);
+			}
+			xpAtLastAreaChange = xpCurrent;
+			normalKillsInArea = 0;
+			magicKillsInArea = 0;
+			rareKillsInArea = 0;
+			uniqueKillsInArea = 0;
 		}
 
 		~DPSMonitor() {
@@ -59,14 +74,24 @@ namespace Assistant {
 			Sighting seen = seenMonsters[ent.Id];
 			long damage = seen.AddedHP;
 			long ms = 1 + (seenTimer.ElapsedMilliseconds - seen.FirstDamageTime);
-			if ( ms > 100 && damage > 1 ) {
+			if ( ms > 50 && damage > 1 ) {
 				double dps = damage * 1000d / ms;
 				string path = ent.Path.Split('/').Last();
-				Log($"{path} {formatNumber(damage * 1000f / ms)}dps = {seen.AddedHP}hp / {ms}ms ]");
-				if ( (settings?.ShowDPS ?? false) && ent.Rarity >= MonsterRarity.Rare )
+				string dpsText = formatNumber(dps);
+				string fullText = $"{path} {dpsText}dps = {formatNumber(seen.AddedHP)}hp / {ms}ms ]";
+				Log(fullText);
+				if ( (settings?.ShowDPS ?? false) && ent.Rarity >= MonsterRarity.Rare ) {
 					PersistedText.Add(formatNumber(dps), ent.Pos, 4000, Color.Aqua);
+					Notify($"DPS: {dpsText}" , Color.Aqua, 6000, 1f);
+				}
 			}
 			seenMonsters.Remove(ent.Id);
+			switch( ent.Rarity ) {
+				case MonsterRarity.White: normalKillsInArea += 1; break;
+				case MonsterRarity.Magic: magicKillsInArea += 1; break;
+				case MonsterRarity.Rare: rareKillsInArea += 1; break;
+				case MonsterRarity.Unique: uniqueKillsInArea += 1; break;
+			}
 
 			if( GetSettings().ShowXPGains ) {
 				dyingMonsters.Enqueue(ent.Pos);
