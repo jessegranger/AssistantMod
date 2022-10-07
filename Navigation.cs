@@ -64,7 +64,7 @@ namespace Assistant {
 		private static int CurrentAreaCode;
 
 		public static void Initialise() {
-			Run((state) => {
+			Run("Navigation", (state) => {
 				int areaCode = GetGame().Area.CurrentArea.Area.WorldAreaId;
 				if( areaCode != 0 && areaCode != CurrentAreaCode ) {
 					CurrentAreaCode = areaCode;
