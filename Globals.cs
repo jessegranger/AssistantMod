@@ -752,7 +752,8 @@ namespace Assistant {
 				if ( value != 0 ) {
 					Element probe = new Element { Address = value };
 					if ( IsValid(probe) ) {
-						lineBack += $" Element: {string.Join("", probe.GetInnerText()?.Take(24))}";
+						// lineBack += $" Element: {string.Join("", probe.GetInnerText()?.Take(24))}";
+						lineBack += $" Element: {string.Join("", probe.Text?.Take(24))}";
 					} else {
 						string ascii = M.ReadString(value, 16, true);
 						if ( (ascii?.Length ?? 0) > 0 ) {

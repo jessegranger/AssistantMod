@@ -733,7 +733,6 @@ namespace Assistant {
 				}
 			}
 		}
-		*/
 
 		public IEnumerable<string> FindAllTooltips(Element node, string path, HashSet<Element> seen) {
 			if ( seen == null ) seen = new HashSet<Element>();
@@ -750,6 +749,7 @@ namespace Assistant {
 			}
 
 		}
+		*/
 
 		public IEnumerable<Element> FindElementsContainingString(Element node, string path, string text, HashSet<Element> seen) {
 			if ( seen == null ) seen = new HashSet<Element>();
