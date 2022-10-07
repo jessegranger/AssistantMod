@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Windows.Forms;
 using static Assistant.Globals;
 
 namespace Assistant {
@@ -17,17 +18,20 @@ namespace Assistant {
 				Log("No game.");
 				return;
 			}
+			// Notify();
 			//  InventoryReport();
 			//  TestFlaskInventory();
 			//  TestPlayerLife();
 			//  TestStash();
-			// Equipment();
+			Equipment();
 			// Stats();
 			//  TestNearbyBuffs();
 			SkillBar();
 			//  TestDeployedObjects();
 			//  TestLabelsOnGround();
 			//  InputManager.Add(InputManager.PlanChangeStashTab(16));
+			// InventoryPosition();
+			// InputLag();
 
 			/*
 			InputManager.Add(
@@ -40,6 +44,38 @@ namespace Assistant {
 					new KeyUp(VirtualKeyCode.VK_2))))))));
 			*/
 
+		}
+
+		internal static void InputLag() {
+			int count = 0;
+			Run(State.From("InputLag", (self) => {
+				if ( count++ > 150 ) {
+					return null;
+				} else {
+					DrawTextAtPlayer($"InputLagTest: {count}");
+					InputSimulator.Dispatch(
+						InputSimulator.KeyDownMessage(Keys.LControlKey),
+						InputSimulator.KeyDownMessage(Keys.A),
+						InputSimulator.KeyUpMessage(Keys.A),
+						InputSimulator.KeyUpMessage(Keys.LControlKey)
+					);
+					return new Delay(30, self);
+				}
+			}));
+		}
+
+		internal static void InventoryPosition() {
+			for(uint x = 0; x < 12; x++ ) {
+				for(uint y = 0; y < 5; y++ ) {
+					PersistedText.Add($"{x},{y}", Inventory.GetSlotPositionAbsolute(x, y), 8000, Color.White);
+				}
+			}
+		}
+
+		internal static void Notify() {
+			Log($"Notify: sending...");
+			Globals.Notify("This is a test notification", Color.Yellow, 3000, 1f);
+			Globals.Notify("This is a second test", Color.Orange, 3000, 1f);
 		}
 
 		internal static void PlayerLife() {
