@@ -80,7 +80,6 @@
     <Compile Include="BuffManager.cs" />
     <Compile Include="ChaosRecipe.cs" />
     <Compile Include="DPSMonitor.cs" />
-    <Compile Include="DeathTracker.cs" />
     <Compile Include="EquipmentManager.cs" />
     <Compile Include="EventTracker.cs" />
     <Compile Include="FlaskManager.cs" />
