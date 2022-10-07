@@ -5,6 +5,7 @@ using ExileCore.PoEMemory.Elements;
 using ExileCore.PoEMemory.Elements.InventoryElements;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
+using ExileCore.Shared.Interfaces;
 using SharpDX;
 using System;
 using System.Collections.Generic;
@@ -34,6 +35,7 @@ namespace Assistant {
 			} else {
 				Settings.Enable.Value = false;
 			}
+			// Uncomment to see detailed state transitions in the logs
 			// Machine.EnableLogging((s) => Log(s));
 		}
 
@@ -83,6 +85,7 @@ namespace Assistant {
 		public static Graphics GetGraphics() => Gfx;
 		public static GameController GetGame() => Game;
 		public static AssistantSettings GetSettings() => Settings;
+		public static IngameUIElements GetUI() => Game?.IngameState?.IngameUi;
 
 		public static Entity GetPlayer() => Game?.Player;
 
@@ -90,19 +93,49 @@ namespace Assistant {
 		public static float GetLineHeight() => 18f; // TODO: read the font setting from Core
 
 		private static int bottomRightLineCount = 0;
+		private static int topLeftLineCount = 0;
+
 		private static float bottomTextPadding = 4f;
+		private static float rightTextPadding = 4f;
+		private static float topTextPadding = 100f;
+		private static float leftTextPadding = 10f;
+		internal static Vector2 NextBottomRightLinePos() {
+			return GetWindow().BottomRight - new Vector2(
+				rightTextPadding,
+				bottomTextPadding + (GetLineHeight() * (1 + bottomRightLineCount))
+			);
+		}
+		internal static Vector2 NextTopLeftLinePos() {
+			return GetWindow().TopLeft + new Vector2(
+				leftTextPadding,
+				topTextPadding + (GetLineHeight() * (1 + topLeftLineCount))
+			);
+		}
+		public static void DrawTopLeftText(string line) => DrawTopLeftText(line, Color.White);
+		public static void DrawTopLeftText(string line, Color color) => DrawTopLeftText(line, color, Vector2.Zero);
+		public static void DrawTopLeftText(string line, Color color, Vector2 offset) {
+			Gfx.DrawText(line, NextTopLeftLinePos() + offset, color, FontAlign.Left);
+			topLeftLineCount += 1;
+		}
+		public static void DrawTopLeftText(string line, Color color, uint duration) {
+			long start = Time.ElapsedMilliseconds;
+			Run(State.From("DrawTopLeftText", (self) => {
+				if ( Time.ElapsedMilliseconds - start >= duration ) return null;
+				else DrawTopLeftText(line, color);
+				return self;
+			}));
+		}
 		public static void DrawBottomRightText(string line) => DrawBottomRightText(line, Color.White);
-		public static void DrawBottomRightText(string line, Color color) {
-			var rect = GetWindow();
+		public static void DrawBottomRightText(string line, Color color) => DrawBottomRightText(line, color, Vector2.Zero);
+		public static void DrawBottomRightText(string line, Color color, Vector2 offset) {
+			Gfx.DrawText(line, NextBottomRightLinePos() + offset, color, FontAlign.Right);
 			bottomRightLineCount += 1;
-			var pos = rect.BottomRight;
-			pos.Y -= bottomTextPadding + (GetLineHeight() * bottomRightLineCount);
-			Gfx.DrawText(line, pos, color, FontAlign.Right);
 		}
 		public static void Render() {
 			if ( !IsInitialised ) return;
 			lineCounts.Clear();
 			bottomRightLineCount = 0;
+			topLeftLineCount = 0;
 			string zoneTime = timeInZone.Elapsed.ToString(@"mm\:ss");
 			DrawBottomRightText($"[{(isPaused ? "=" : ">")}] ({zoneTime})", Color.Orange);
 		}
@@ -175,6 +208,7 @@ namespace Assistant {
 		public static bool IsValid(AreaInstance area) => area != null && area.Name != null;
 		public static bool IsValid(AreaController area) => area != null && area.CurrentArea != null && area.CurrentArea.Name != null;
 		public static bool IsValid(RemoteMemoryObject item) => (item != null && item.Address != 0);
+		public static bool IsValid(Element item) => (item != null && item.Address != 0 && item.IsValid && item.ChildCount >= 0 && item.ChildCount < 65535);
 		public static bool IsValid(NormalInventoryItem item) => (item != null && item.IsValid && item.Item != null && item.Item.Path != null);
 		public static bool IsValid(Entity ent) => (ent != null && ent.Path != null && ent.IsValid);
 		public static bool IsValid(ServerInventory.InventSlotItem item) => item != null && IsValid(item.Item);
@@ -610,7 +644,10 @@ namespace Assistant {
 		}
 
 		private static State TrackMovement(State current) {
-			if ( movementTimer.ElapsedMilliseconds > 66 ) {
+			if( IsPaused() ) {
+				isMoving = false;
+				lastPosition = Vector3.Zero;
+			} else if ( movementTimer.ElapsedMilliseconds > 66 ) {
 				movementTimer.Restart();
 				var pos = GetPlayer()?.Pos ?? Vector3.Zero;
 				isMoving = lastPosition != Vector3.Zero && pos != Vector3.Zero && 
@@ -649,8 +686,97 @@ namespace Assistant {
 
 		private static Stopwatch timeInZone = new Stopwatch();
 		private static void Area_OnAreaChange(AreaInstance obj) {
-			Log(string.Format("Leaving Zone after {0}", timeInZone.Elapsed.ToString(@"mm\:ss")));
+			Notify($"Leaving Zone after {GetTimeInZone().ToString(@"mm\:ss")}", Color.Orange);
 			timeInZone.Restart();
+		}
+		public static TimeSpan GetTimeInZone() => timeInZone.Elapsed;
+
+		private static long timeOfLastNotify = 0;
+		public static void Notify(string text, Color color, uint duration = 3000, float speed = 1f) {
+			Log("Notify: " + text);
+			Vector2 pos = NextBottomRightLinePos();
+			long timeSinceLastNotify = Time.ElapsedMilliseconds - timeOfLastNotify;
+			if( timeSinceLastNotify < GetLineHeight() ) {
+				pos.Y += GetLineHeight() - timeSinceLastNotify;
+			}
+			timeOfLastNotify = Time.ElapsedMilliseconds;
+			Stopwatch timer = Stopwatch.StartNew();
+			Run((state) => {
+				if ( timer.ElapsedMilliseconds > duration ) {
+					timer.Stop();
+					return null;
+				} else {
+					Gfx.DrawText(text, pos, color, FontAlign.Right);
+					pos.Y -= speed;
+					return state;
+				}
+			});
+		}
+
+		public static State Notify(string text, Color color, uint duration, float speed, State next) {
+			return State.From("Notify", (state) => {
+				Notify(text, color, duration, speed);
+				return state.Next;
+			}, next);
+		}
+
+		public static void DrawFrame(RectangleF rect, Color color, int thickness, uint duration, State next = null) {
+			long start = Time.ElapsedMilliseconds;
+			Run(State.From("DrawFrame", (self) => {
+				if ( Time.ElapsedMilliseconds - start >= duration ) return self.Next;
+				GetGraphics().DrawFrame(rect, color, thickness);
+				return self;
+			}, next));
+		}
+
+		public static void DrawText(string text, Vector2 pos, Color color, uint duration, State next = null ) {
+			long start = Time.ElapsedMilliseconds;
+			Run(State.From("DrawText", (self) => {
+				if ( Time.ElapsedMilliseconds - start >= duration ) return self.Next;
+				GetGraphics().DrawText(text, pos, color);
+				return self;
+			}, next));
+		}
+
+		public static void DrawMemory(IMemory M, long startAddress, long endAddress, Vector2 pos, Color color) {
+			for ( long i = startAddress; i <= endAddress; i += sizeof(long) ) {
+				string lineFront = $"{i:X2}:";
+				string lineBack = "";
+				for ( long j = i; j < (i + sizeof(long)); j += 1 ) {
+					byte b = M.Read<byte>(j);
+					lineFront += $" {b:X2}";
+					lineBack += $" {Convert.ToChar(b == 0 || b > 127 ? (int)'?' : b)}";
+				}
+				long value = M.Read<long>(i);
+				lineBack += $" <{value:d14}>";
+				if ( value != 0 ) {
+					Element probe = new Element { Address = value };
+					if ( IsValid(probe) ) {
+						lineBack += $" Element: {string.Join("", probe.GetInnerText()?.Take(24))}";
+					} else {
+						string ascii = M.ReadString(value, 16, true);
+						if ( (ascii?.Length ?? 0) > 0 ) {
+							lineBack += " ASCII: " + ascii;
+						} else {
+							string unicode = M.ReadStringU(value, 16, true);
+							if ( (unicode?.Length ?? 0) > 0 ) {
+								lineBack += " Unicode: " + unicode;
+							}
+						}
+					}
+				}
+				GetGraphics().DrawText(lineFront + lineBack, pos, color);
+				pos.Y += GetLineHeight();
+			}
+		}
+
+		public static void DrawMemory(IMemory M, long start, long end, Vector2 pos, Color color, uint duration, State next = null) {
+			long started = Time.ElapsedMilliseconds;
+			Run(State.From("DrawMemory", (self) => {
+				if ( Time.ElapsedMilliseconds - started >= duration ) return null;
+				DrawMemory(M, start, end, pos, color);
+				return self;
+			}));
 		}
 
 	}
