@@ -31,8 +31,6 @@ namespace Assistant {
 			FlaskManager.Initialise();
 			Log("SkillManager: Init...");
 			SkillManager.Initialise();
-			Log("DeathTracker: Init...");
-			DeathTracker.Initialise();
 			Log("Navigation: Init...");
 			Navigation.Initialise();
 
@@ -78,20 +76,20 @@ namespace Assistant {
 				() => IsMissingLife(GameController.Player, 1000));
 
 			// Infernal Cry
-			Run("SkillInfernalCry", (state) => {
-				if ( !(Settings.UseInfernalCry?.Enabled ?? false) ) return state;
+			Run("SkillInfernalCry", (self) => {
+				if ( !(Settings.UseInfernalCry?.Enabled ?? false) ) return self;
 				var hostile = NearbyEnemies(50)
 					.FirstOrDefault(e => IsAlive(e)
 						&& e.IsHostile
 						&& e.IsTargetable
 						&& e.Rarity >= MonsterRarity.Rare
 						&& !HasBuff(e, "infernal_cry"));
-				if( hostile != null ) {
-					Log($"Infernal cry re: {hostile.Path} {hostile.IsAlive} {hostile.GetComponent<Life>().CurHP} {hostile.DistancePlayer:F2}");
+				if ( hostile != null ) {
+					Log($"Infernal cry re: {hostile.Path.Split('/').Last()} {hostile.IsAlive} {hostile.GetComponent<Life>().CurHP} {hostile.DistancePlayer:F2}");
 					SkillManager.TryUseSkill("AbyssalCry", Settings.UseInfernalCry.Value);
-					return new Delay(1000, state);
+					return new Delay(1000, self);
 				}
-				return new Delay(300, state);
+				return new Delay(300, self);
 			});
 			/*
 			// Malevolence (as a Blessing)
@@ -147,6 +145,172 @@ namespace Assistant {
 			OnRelease(Keys.F6, Test.RunAll);
 			OnRelease(Keys.F5, () => ChatCommand("/hideout"));
 
+			// DEBUG:
+			/*
+			uint delay = 16;
+			OnRelease(Keys.F11, () => Run((state) => IsPaused() ? null : 
+				// new MoveMouse(1, 1, new Delay(delay, 
+				// State.From(() => Notify("KeyDown", Color.Yellow),
+				State.From(() => InputSimulator.Dispatch(
+					// InputSimulator.KeyDownMessage(Keys.LControlKey),
+					InputSimulator.MouseMessage(InputSimulator.MouseFlag.LeftDown),
+					InputSimulator.MouseMessage(InputSimulator.MouseFlag.LeftUp)
+					// InputSimulator.KeyUpMessage(Keys.LControlKey)
+				), new Delay(delay,
+				state))));
+			*/
+			// OnRelease(Keys.F11, () => Run(Inventory.PlanIdentifyAll(null)));
+			// OnRelease(Keys.F11, () => Run(Inventory.PlanIncubateAll(null)));
+			// OnRelease(Keys.F11, () => Run(Inventory.PlanStashAll(null)));
+			// OnRelease(Keys.F11, () => {
+			// for(int i = 0x200; i < 0x999; i += 8 ) {
+			// EntityLabel.LengthOffset = i;
+			// var text = string.Join(",", GameController.IngameState.IngameUi.ItemsOnGroundLabels.Take(3).Select(x => x.Label.SumInnerLength()));
+			// if( text?.Length > 0 ) {
+			// DebugWindow.LogDebug($"LengthOffset {EntityLabel.LengthOffset:X}: {text}");
+			// }
+			// }
+			// });
+
+			// OnRelease(Keys.F11, () => {
+			// for ( int i = 0x400; i < 0x799; i += 8 ) {
+			// EntityLabel.TextOffset = i;
+			// var text = GameController.IngameState.IngameUi.SkillBar.Children[1].GetInnerText();
+			// if ( text?.Length > 0 ) {
+			// DebugWindow.LogDebug($"TextOffset {EntityLabel.TextOffset:X}: {text}");
+			// }
+			// }
+			// });
+
+			OnRelease(Keys.F11, () => {
+				// foreach(var child in GetGame().IngameState.IngameUi.HiddenSkillBar.Children ) {
+				// DebugWindow.LogDebug($"{child.Texture} {child.GetChildFromIndices(0,0,0,0)?.Texture ?? "null"} {child.GetChildFromIndices(0,0,0,1)?.Text ?? "null"}"); // {child.Children[0]?.Children[0]?.Children[0]?.Children[0]?.Children[1]??? "(none)"}");
+				// if [0->0->0->0].Texture == "Common/4.dds" that is the left-mouse button
+
+				// }
+				// var settings = GetSettings();
+				// Run(BuffManager.ClickOnSkillBarSkill("Grace"));
+				// Run(BuffManager.ClickOnSkillBarHotkey("Q", BuffManager.ClickOnHiddenSkillBarSkill("Grace")));
+
+				// foreach(var elem in FindElementsContainingString(GetUI(), "Root", "ooldown", null)) {
+				// DebugWindow.LogDebug($"{elem.PathFromRoot} : {elem.Text}");
+				// }
+				// foreach(string path in FindAllTooltips(GetUI().SkillBar, "SkillBar", null)) {
+				// DebugWindow.LogDebug($"{path}");
+				// }
+				SkillBarElement child = GetUI().SkillBar;
+				for(int i = 0; i < child.ChildCount; i++ ) {
+					var slot = child.GetSkillSlot(i);
+					Log($"My address {child.Children[i]?.Address} should == {slot?.Address}");
+					Log($"Parent address {slot?.Parent.Address} should == {child.Address}");
+					if( IsValid(slot) ) {
+						DrawTopLeftText($"Skill: {i} Name:{slot.TooltipName} Key:{slot.KeyBind} Texture:{slot.Texture}", Color.White, 30000);
+					}
+				}
+				/*
+				for ( int i = 0x3D0; i <= 0x4B0; i += sizeof(long) ) {
+					string lineFront = $"{i:X2}:";
+					string lineBack = "";
+					for ( int j = i; j < (i + sizeof(long)); j += 1 ) {
+						byte b = child.M.Read<byte>(child.Address + j);
+						lineFront += $" {b:X2}";
+						lineBack += $" {Convert.ToChar(b == 0 || b > 127 ? (int)'?' : b)}";
+					}
+					long value = child.M.Read<long>(child.Address + i);
+					lineBack += $" <{value:d14}>";
+					if ( value != 0 ) {
+						Element probe = new Element { Address = value };
+						if ( IsValid(probe) ) {
+							lineBack += $" Element: {string.Join("", probe.GetInnerText()?.Take(24))}";
+						} else {
+							string ascii = child.M.ReadString(value, 16, true);
+							if ( (ascii?.Length ?? 0) > 0 ) {
+								lineBack += " ASCII: " + ascii;
+							} else {
+								string unicode = child.M.ReadStringU(value, 16, true);
+								if ( (unicode?.Length ?? 0) > 0 ) {
+									lineBack += " Unicode: " + unicode;
+								}
+							}
+						}
+					}
+					DrawTopLeftText(lineFront + lineBack, Color.White, 30000);
+				}
+
+				for(int i = 0; i < 13; i++ ) {
+					Element tooltip = child.GetTooltip(i);
+					if( IsValid(tooltip) ) {
+						DrawFrame(tooltip.GetClientRectCache, Color.Pink, 2, 10000);
+						DrawText($"{i}", tooltip.GetClientRectCache.TopLeft, Color.White, 10000);
+					}
+				}
+				*/
+
+				// DrawAllFrames(child, Color.Yellow, 2, 50000);
+				
+				/*
+				var elem = GetGame().IngameState.IngameUi.HiddenSkillBar.Children[2];
+				for(var i = 0; i < 0x2999; i += sizeof(long) ) {
+					var ent = elem.GetMemoryEntity(i);
+					if( IsValid(ent) )
+						DebugWindow.LogDebug($"Offset {i:X}: {ent.Path}");
+				}
+				*/
+				// find the SkillBar Element with child (0,0,0,1).Text == settings.UseReapplyAuraKey
+				// save which texture is selected
+				// click it
+				// find the HiddenSkillBar Element with the texture of the aura we want to apply
+				// click it in the HiddenSkillBar
+				// cast the skill using UseReapplyAuraKey
+				// repeat for all auras
+				// click it
+				// find the HiddenSkillBar Element with the saved texture
+				// click it in the HiddenSkillBar
+			});
+
+			// Run((state) => {
+				// RenderFramesAroundTooltipsInside(GetGame().IngameState.IngameUi.SkillBar.Children[1]);
+				// return state;
+			// });
+
+			// ConfigureHotkey(Settings.UseReapplyAuraKey, () => BuffManager.ReapplyAuras());
+
+			bool shiftDownBefore = false;
+			bool ctrlDownBefore = false;
+			bool leftDownBefore = false;
+			long leftDownSince = 0;
+			long lastLeftRepeat = 0;
+			Run((state) => {
+				if ( IsPaused() ) return state;
+				var settings = GetSettings();
+				if ( !settings.UseAutoMouse ) return state;
+				bool shiftDownNow = IsKeyDown(Keys.LShiftKey);
+				bool ctrlDownNow = IsKeyDown(Keys.LControlKey);
+				bool leftDownNow = IsKeyDown(Keys.LButton);
+				bool shouldRun = (settings.UseAutoMouseShift && shiftDownNow) || (settings.UseAutoMouseCtrl && ctrlDownNow);
+				if( leftDownNow && shouldRun ) {
+					if( ! leftDownBefore ) {
+						leftDownSince = lastLeftRepeat = Time.ElapsedMilliseconds;
+					} else {
+						long leftDownDuration = Time.ElapsedMilliseconds - leftDownSince;
+						long leftSinceLast = Time.ElapsedMilliseconds - lastLeftRepeat;
+						if( leftDownDuration > 500 ) {
+							if( leftSinceLast > 133 ) {
+								InputSimulator.Dispatch(
+									InputSimulator.MouseMessage(InputSimulator.MouseFlag.LeftUp),
+									InputSimulator.MouseMessage(InputSimulator.MouseFlag.LeftDown)
+								);
+								lastLeftRepeat = Time.ElapsedMilliseconds;
+							}
+						}
+					}
+				}
+				leftDownBefore = leftDownNow;
+				shiftDownBefore = shiftDownNow;
+				ctrlDownBefore = ctrlDownNow;
+				return state;
+			});
+
 			Run((state) => {
 				NormalInventoryItem item;
 				if ( ! BackpackIsOpen() ) return state;
@@ -181,7 +345,7 @@ namespace Assistant {
 						item = BackpackItems().FirstOrDefault();
 						if( item != null ) {
 							return new CtrlLeftClickAt(item, 30, new Delay(100, state));
-						}
+						}	
 					}
 				}
 				/*
@@ -403,22 +567,7 @@ namespace Assistant {
 
 			Run(PlanLootKey(Settings.ClickNearestLabel));
 
-			OnKeyCombo(",20", () => Run(new KeyDown(Keys.LShiftKey,
-				new LeftClick(40, 20, 
-				new KeyUp(Keys.LShiftKey)))));
-
-			OnKeyCombo(",4", () => Run(new KeyDown(Keys.LShiftKey,
-				new LeftClick(40, 4, 
-				new KeyUp(Keys.LShiftKey)))));
-
-			OnKeyCombo(",l22", () => Run(PlanToLinkItem(2, 2)));
-			OnKeyCombo(",l31", () => Run(PlanToLinkItem(3, 1)));
-			OnKeyCombo(",l4", () => Run(PlanToLinkItem(4, 0)));
-			OnKeyCombo(",l5", () => Run(PlanToLinkItem(5, 0)));
-			OnKeyCombo(",l6", () => Run(PlanToLinkItem(6, 0)));
-
 			OnKeyCombo(",,", () => {
-				Log($"Combo #2 triggered.");
 				if ( !BackpackIsOpen() ) return;
 				Inventory.RefreshBackpack();
 				var item = BackpackItems().Where(i => IsValid(i) && i.Item.Path.StartsWith(PATH_MAP_PREFIX)).FirstOrDefault();
@@ -496,8 +645,8 @@ namespace Assistant {
 					int packSize = 0;
 					foreach(var mod in mods.ItemMods) {
 						if ( // any of the banlisted mods:
-							// mod.Name.StartsWith("MapPlayerMaxResists") ||
-							// mod.Name.StartsWith("MapMonsterPhysicalReflection") ||
+							mod.Name.StartsWith("MapPlayerMaxResists") ||
+							mod.Name.StartsWith("MapMonsterPhysicalReflection") ||
 							mod.Name.StartsWith("MapMonsterElementalReflection") ||
 							mod.Name.StartsWith("MapPlayerNoLifeESRegen") ) {
 							Log($"Target map has bad mod: {mod.DisplayName}, scouring.");
@@ -558,6 +707,70 @@ namespace Assistant {
 			*/
 			return true;
 		}
+
+		public void DrawAllFrames(Element node, Color color, int thickness, uint duration) => DrawAllFrames(node, color, thickness, duration, Vector2.Zero);
+		public void DrawAllFrames(Element node, Color color, int thickness, uint duration, Vector2 textOffset) {
+			Element child = GetUI().SkillBar;
+			for ( long i = 0x30; i < 0x1999; i += sizeof(long) ) {
+				long addr = child.GetMemoryLong(i);
+				Element attempt = new Element { Address = addr };
+				if ( IsValid(attempt) ) {
+					DrawTopLeftText($"base+{i:X}->{addr:X}: Element pointer to : {attempt.GetInnerText()}", Color.Yellow, duration);
+					DrawFrame(attempt.GetClientRectCache, Color.Yellow, 3, duration);
+					DrawText($"base+{i:X}:", attempt.GetClientRectCache.TopLeft, Color.White, duration);
+				} else {
+					addr = child.M.Read<long>(addr);
+					attempt = new Element { Address = addr };
+					if ( IsValid(attempt) ) {
+						DrawTopLeftText($"base+{i:X}->{addr:X}: Array of element pointers to : {attempt.GetInnerText()}", Color.Yellow, duration);
+						DrawFrame(attempt.GetClientRectCache, Color.Pink, 1, duration);
+						DrawText($"base+{i:X}:", attempt.GetClientRectCache.TopLeft, Color.White, duration);
+					}
+				}
+			}
+		}
+
+		public IEnumerable<string> FindAllTooltips(Element node, string path, HashSet<Element> seen) {
+			if ( seen == null ) seen = new HashSet<Element>();
+			if ( seen.Contains(node) ) yield break;
+			else seen.Add(node);
+
+			if ( IsValid(node?.Tooltip) ) yield return path + $">Tooltip : {node.Tooltip.GetInnerText()}";
+			var children = node.Children;
+			for ( int i = 0; i < children.Count; i++ ) {
+				var child = children[i];
+				foreach(var elem in FindAllTooltips(child, path + $">{i}", seen)) {
+					yield return elem;
+				}
+			}
+
+		}
+
+		public IEnumerable<Element> FindElementsContainingString(Element node, string path, string text, HashSet<Element> seen) {
+			if ( seen == null ) seen = new HashSet<Element>();
+
+			if ( seen.Contains(node) ) yield break;
+			else seen.Add(node);
+
+			if ( node.Text?.Contains(text) ?? false ) {
+				yield return node;
+			}
+			if( IsValid(node.Tooltip) ) foreach ( var elem in FindElementsContainingString(node.Tooltip, path + ">Tooltip", text, seen) ) {
+				yield return elem;
+			}
+
+			if( node?.Children != null ) {
+				var children = node.Children;
+				for ( int i = 0; i < children.Count; i++ ) {
+					var child = children[i];
+					if( IsValid(child) ) foreach ( var elem in FindElementsContainingString(child, path + $">{i}", text, seen) ) {
+						yield return elem;
+					}
+				}
+			}
+			yield break;
+		}
+
 		internal State PlanTemporalRift() {
 			int[] recentPast = new int[4];
 			long mostRecentSample = 0;
@@ -587,6 +800,21 @@ namespace Assistant {
 				}
 				return state;
 			});
+		}
+
+		private void RenderFramesAroundTooltipsInside(Element elem) {
+			var hover = elem.AsObject<HoverItemIcon>();
+			Graphics.DrawFrame(hover.InventoryItemTooltip.GetClientRectCache, Color.Pink, 2);
+			Graphics.DrawText("InventoryItemTooltip", hover.InventoryItemTooltip.GetClientRectCache.TopLeft);
+			Graphics.DrawFrame(hover.ToolTipOnGround.GetClientRectCache, Color.Green, 2);
+			Graphics.DrawText("ToolTipOnGround", hover.ToolTipOnGround.GetClientRectCache.TopLeft);
+			Graphics.DrawFrame(hover.ItemInChatTooltip.GetClientRectCache, Color.Orange, 2);
+			Graphics.DrawText("ItemInChatTooltip", hover.ItemInChatTooltip.GetClientRectCache.TopLeft);
+
+			foreach(var child in elem.Children) {
+				RenderFramesAroundTooltipsInside(child);
+			}
+
 		}
 
 		internal State PlanMonitorXP() {
@@ -665,60 +893,9 @@ namespace Assistant {
 			return new MoveMouse(pos.X, pos.Y, state).OnTick();
 		});
 
-		private State PlanToLinkItem(int linksInGroupOne, int linksInGroupTwo, State next = null) {
-			bool needShift = linksInGroupOne == 6;
-			bool didShift = false;
-			return State.From("LinkItem", (state) => {
-				if ( !StashIsOpen() ) {
-					Log($"Stash is closed.");
-					return next;
-				}
-				var item = StashItems().Where(i => IsValid(i) && !i.Item.HasComponent<Stack>()).FirstOrDefault();
-				if ( !IsValid(item) ) {
-					Log($"LinkItem: invalid target item.");
-					return next;
-				}
-				Log($"Target item: {item.Item.Path}");
-				var sockets = item.Item.GetComponent<Sockets>();
-				if ( sockets == null ) {
-					Log($"LinkItem: item has no Sockets component.");
-					return next;
-				}
-				if ( sockets.NumberOfSockets < linksInGroupOne || sockets.NumberOfSockets < linksInGroupTwo ) {
-					Log($"LinkItem: item cannot support {Math.Max(linksInGroupOne, linksInGroupTwo)} links (has {sockets.NumberOfSockets})");
-					return next;
-				}
-				if ( needShift && !didShift ) {
-					didShift = true;
-					return Inventory.PlanUseStashItem(PATH_FUSING, new KeyDown(Keys.LShiftKey, state));
-				}
-				bool matchedOne = false;
-				bool matchedTwo = linksInGroupTwo == 0;
-				foreach ( var links in sockets.Links ) {
-					Log($"Links: {links.Length}");
-					if ( (!matchedOne) && links.Length == linksInGroupOne ) {
-						Log($"Matched group one ({linksInGroupOne})");
-						matchedOne = true;
-					} else if ( (!matchedTwo) && links.Length == linksInGroupTwo ) {
-						Log($"Matched group two ({linksInGroupTwo}))");
-						matchedTwo = true;
-					}
-				}
-				if ( matchedOne && matchedTwo ) {
-					Log($"Complete.");
-					return next;
-				}
-				Log($"Trying to use an Orb of Fusing...");
-				return Inventory.PlanUseStashItemOnItem(PATH_FUSING, item, 1, new Delay(100, state));
-			});
-		}
-
-
-
 
 		private ChaosRecipe currentRecipe = new ChaosRecipe();
 		private bool showRecipe = false;
-
 		private Vector2 DrawLineAt(string text, Vector2 pos) => DrawLineAt(text, pos, Color.White);
 		private Vector2 DrawLineAt(string text, Vector2 pos, Color color) {
 			Graphics.DrawText(text, pos, color);
@@ -824,7 +1001,6 @@ namespace Assistant {
 				FlaskManager.OnTick();
 				BuffManager.OnTick();
 				EventTracker.OnTick();
-				DeathTracker.OnTick();
 				EquipmentManager.OnTick();
 				FocusManager.OnTick();
 
@@ -924,13 +1100,17 @@ namespace Assistant {
 			}
 		}
 
+		public static int RenderFrameCount = 0;
+
 		public override void Render() {
 			try {
 				var ui = GameController.Game.IngameState.IngameUi;
 				var camera = GameController.Game.IngameState.Camera;
+				RenderFrameCount += 1;
+				// DrawBottomRightText($"Frame: {RenderFrameCount}");
+
 				Globals.Render();
 				PersistedText.Render(camera, Graphics);
-				DeathTracker.Render();
 
 				var stash = GameController.Game.IngameState.IngameUi.StashElement;
 				if ( showRecipe && stash != null && stash.IsValid && stash.IsVisible && stash.IndexVisibleStash == 0 )
@@ -991,8 +1171,10 @@ namespace Assistant {
 				}
 
 				if ( Settings.ShowCursorPosition.Value ) {
-					var pos = WindowToScreenRelative(Input.MousePosition);
+					var abs = Input.MousePosition;
+					var pos = WindowToScreenRelative(abs);
 					DrawTextAtPlayer($"X: {pos.X} Y: {pos.Y}");
+					DrawTextAtPlayer($"X: {abs.X} Y: {abs.Y}");
 				}
 
 				if ( Settings.ShowAttackRate.Value ) {

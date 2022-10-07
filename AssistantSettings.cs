@@ -68,12 +68,36 @@ namespace Assistant {
 		[Menu("Use Malevolence", 1, 5010)] public ToggleNode UseMalevolenceBlessing { get; set; }
 		[Menu("Maintain Divine Blessing", 1, 5010)] public ToggleHotkeyNode UseDivineBlessing { get; set; } = Keys.W;
 
+		/*
+		[Menu("Aura", 5014)] public EmptyNode EmptyAura { get; set; } = new EmptyNode();
+		[Menu("Arctic Armour", 1, 5014)] public ToggleNode UseArcticArmourAura { get; set; }
+		[Menu("Purity of Elements", 1, 5014)] public ToggleNode UsePurityOfElementsAura { get; set; }
+		[Menu("Purity of Fire", 1, 5014)] public ToggleNode UsePurityOfFireAura { get; set; }
+		[Menu("Purity of Ice", 1, 5014)] public ToggleNode UsePurityOfIceAura { get; set; }
+		[Menu("Purity of Lightning", 1, 5014)] public ToggleNode UsePurityOfLightningAura { get; set; }
+		[Menu("Vitality", 1, 5014)] public ToggleNode UseVitalityAura { get; set; }
+		[Menu("Clarity", 1, 5014)] public ToggleNode UseClarityAura { get; set; }
+		[Menu("Precision", 1, 5014)] public ToggleNode UsePrecisionAura { get; set; }
+		[Menu("Determination", 1, 5014)] public ToggleNode UseDeterminationAura { get; set; }
+		[Menu("Discipline", 1, 5014)] public ToggleNode UseDisciplineAura { get; set; }
+		[Menu("Haste", 1, 5014)] public ToggleNode UseHasteAura { get; set; }
+		[Menu("Grace", 1, 5014)] public ToggleNode UseGraceAura { get; set; }
+		[Menu("Anger", 1, 5014)] public ToggleNode UseAngerAura { get; set; }
+		[Menu("Wrath", 1, 5014)] public ToggleNode UseWrathAura { get; set; }
+		[Menu("Pride", 1, 5014)] public ToggleNode UsePrideAura { get; set; }
+		[Menu("Hatred", 1, 5014)] public ToggleNode UseHatredAura { get; set; }
+		[Menu("Zealotry", 1, 5014)] public ToggleNode UseZealotryAura { get; set; }
+		[Menu("Malevolence", 1, 5014)] public ToggleNode UseMalevolenceAura { get; set; }
+		[Menu("Re-apply Auras", "Use a key from the front page of skill bar", 1, 5014)] public ToggleHotkeyNode UseReapplyAuraKey { get; set; } = Keys.Q;
+		*/
+
 		[Menu("Looting", 5009)] public EmptyNode EmptyLooting { get; set; } = new EmptyNode();
 		[Menu("Identify Maps", 1, 5009)] public ToggleNode IdentifyMaps { get; set; }
-		[Menu("Open Stashed Decks", 2, 5009)] public ToggleNode OpenStashedDecks { get; set; }
-		[Menu("Quick Loot", 3, 5009)] public ToggleHotkeyNode ClickNearestLabel { get; set; } = Keys.NumPad0;
-		[Menu("Stash Deposit", 4, 5009)] public ToggleHotkeyNode StashDeposit { get; set; } = Keys.Oem3;
-		[Menu("Stash Restock", 5, 5009)] public ToggleHotkeyNode StashRestock { get; set; } = Keys.Oem6;
+		[Menu("Apply Incubators", 2, 5009)] public ToggleNode ApplyIncubators { get; set; }
+		[Menu("Open Stashed Decks", 3, 5009)] public ToggleNode OpenStashedDecks { get; set; }
+		[Menu("Quick Loot", 4, 5009)] public ToggleHotkeyNode ClickNearestLabel { get; set; } = Keys.NumPad0;
+		[Menu("Stash Deposit", 5, 5009)] public ToggleHotkeyNode StashDeposit { get; set; } = Keys.Oem3;
+		[Menu("Stash Restock", 6, 5009)] public ToggleHotkeyNode StashRestock { get; set; } = Keys.Oem6;
 
 		[Menu("Accessibility", 5008)] public EmptyNode EmptyAccessibility { get; set; } = new EmptyNode();
 		[Menu("Use Arrow Keys to Move", 0, 5008)] public ToggleNode UseArrowKeys { get; set; }
@@ -82,13 +106,18 @@ namespace Assistant {
 		[Menu("Send With MultiKey #2", 3, 5008)] public ToggleHotkeyNode UseMultiKey2 { get; set; } = Keys.W;
 		[Menu("Send With MultiKey #3", 4, 5008)] public ToggleHotkeyNode UseMultiKey3 { get; set; } = Keys.E;
 
-		[Menu("AutoKey", 5012)] public EmptyNode EmptyAutoKey { get; set; } = new EmptyNode();
+		[Menu("Auto Keys", 5012)] public EmptyNode EmptyAutoKey { get; set; } = new EmptyNode();
 		[Menu("Use Auto-casting", 1, 5012)] public ToggleHotkeyNode UseAutoKey { get; set; } = Keys.Space;
 		[Menu("Cast every 16 seconds", 2, 5012)] public ToggleHotkeyNode AutoKey16Second { get; set; } = Keys.T;
 		[Menu("Cast every 8 seconds", 2, 5012)] public ToggleHotkeyNode AutoKey8Second { get; set; } = Keys.W;
 		[Menu("Cast every 4 seconds", 3, 5012)] public ToggleHotkeyNode AutoKey4Second { get; set; } = Keys.E;
 		[Menu("Cast every 2 seconds", 1, 5012)] public ToggleHotkeyNode AutoKey2Second { get; set; } = Keys.R;
 		[Menu("Cast always", 1, 5012)] public ToggleHotkeyNode AutoKeyElse { get; set; } = Keys.Q;
+
+		[Menu("Auto Mouse", 5013)] public EmptyNode EmptyAutoMouse { get; set; } = new EmptyNode();
+		[Menu("Auto repeat left-clicks", 1, 5013)] public ToggleNode UseAutoMouse { get; set; }
+		[Menu("Repeat during Shift", 2, 5013)] public ToggleNode UseAutoMouseShift { get; set; }
+		[Menu("Repeat during Ctrl", 3, 5013)] public ToggleNode UseAutoMouseCtrl { get; set; }
 
 		[Menu("Debug", 5005)] public EmptyNode EmptyMain { get; set; } = new EmptyNode();
 		[Menu("Show Player Position", 1, 5005)] public ToggleNode ShowPosition { get; set; }
@@ -106,6 +135,7 @@ namespace Assistant {
 		[Menu("Estimate Attack Rate", 12, 5005)] public ToggleNode ShowAttackRate { get; set; }
 		[Menu("Show XP Gains", 13, 5005)] public ToggleNode ShowXPGains { get; set; }
 		[Menu("Show XP Rate", 14, 5005)] public ToggleNode ShowXPRate { get; set; }
+		[Menu("Show XP Report", 14, 5005)] public ToggleNode ShowXPReport { get; set; }
 		[Menu("Show DPS. on Rares", 15, 5005)] public ToggleNode ShowDPS { get; set; }
 		[Menu("Debug Distance", 16, 5005)] public ToggleNode ShowDistance { get; set; }
 		[Menu("Show Sextant Warning", 17, 5005)] public ToggleNode ShowSextantWarning { get; set; }
