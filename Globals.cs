@@ -738,6 +738,7 @@ namespace Assistant {
 			}, next));
 		}
 
+		/*
 		public static void DrawMemory(IMemory M, long startAddress, long endAddress, Vector2 pos, Color color) {
 			for ( long i = startAddress; i <= endAddress; i += sizeof(long) ) {
 				string lineFront = $"{i:X2}:";
@@ -779,6 +780,7 @@ namespace Assistant {
 				return self;
 			}));
 		}
+		*/
 
 	}
 }
